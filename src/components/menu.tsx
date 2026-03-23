@@ -264,55 +264,51 @@ export const Menu = () => {
                   onClick={() => setChatLogMode((prev) => (prev + 1) % 3)}
                 />
               </div>
-              {!youtubeMode && (
-                <>
-                  <div className="order-3">
-                    <IconButton
-                      iconName="screen-share"
-                      isProcessing={false}
-                      onClick={toggleCapture}
-                    />
-                  </div>
-                  <div className="order-4">
-                    <IconButton
-                      iconName="24/Camera"
-                      isProcessing={false}
-                      onClick={toggleWebcam}
-                    />
-                  </div>
-                  {isMultiModalAvailable(
-                    selectAIService as AIService,
-                    selectAIModel,
-                    enableMultiModal,
-                    multiModalMode,
-                    customModel
-                  ) && (
-                    <div className="order-4">
-                      <IconButton
-                        iconName="24/AddImage"
-                        isProcessing={false}
-                        onClick={() => imageFileInputRef.current?.click()}
-                      />
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        ref={imageFileInputRef}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (file) {
-                            const reader = new FileReader()
-                            reader.onload = (e) => {
-                              const imageUrl = e.target?.result as string
-                              homeStore.setState({ modalImage: imageUrl })
-                            }
-                            reader.readAsDataURL(file)
-                          }
-                        }}
-                      />
-                    </div>
-                  )}
-                </>
+              <div className="order-3">
+                <IconButton
+                  iconName="screen-share"
+                  isProcessing={false}
+                  onClick={toggleCapture}
+                />
+              </div>
+              <div className="order-4">
+                <IconButton
+                  iconName="24/Camera"
+                  isProcessing={false}
+                  onClick={toggleWebcam}
+                />
+              </div>
+              {isMultiModalAvailable(
+                selectAIService as AIService,
+                selectAIModel,
+                enableMultiModal,
+                multiModalMode,
+                customModel
+              ) && (
+                <div className="order-4">
+                  <IconButton
+                    iconName="24/AddImage"
+                    isProcessing={false}
+                    onClick={() => imageFileInputRef.current?.click()}
+                  />
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    ref={imageFileInputRef}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        const reader = new FileReader()
+                        reader.onload = (e) => {
+                          const imageUrl = e.target?.result as string
+                          homeStore.setState({ modalImage: imageUrl })
+                        }
+                        reader.readAsDataURL(file)
+                      }
+                    }}
+                  />
+                </div>
               )}
               {youtubeMode && (
                 <div className="order-5">

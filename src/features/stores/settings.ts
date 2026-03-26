@@ -828,7 +828,7 @@ const getInitialValuesFromEnv = (): SettingsState => ({
   surprisedMotionGroup: process.env.NEXT_PUBLIC_SURPRISED_MOTION_GROUP || '',
 })
 
-type PersistedSettingsState = Partial<SettingsState> & {
+type PersistedSettingsState = Omit<Partial<SettingsState>, 'multiModalMode'> & {
   multiModalMode?: SettingsState['multiModalMode'] | 'ai-decide'
   presenceGreetingMessage?: string
   presenceDepartureMessage?: string

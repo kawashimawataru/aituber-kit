@@ -201,7 +201,6 @@ export function useIdleMode({
     idleTimePeriodAfternoonEmotion,
     idleTimePeriodEvening,
     idleTimePeriodEveningEmotion,
-    idleAiGenerationEnabled,
   ])
 
   // ----- 発話実行 -----
@@ -287,7 +286,6 @@ export function useIdleMode({
   }, [idleInterval])
 
   // ----- アイドルモード有効/無効の監視 -----
-  /* eslint-disable react-hooks/set-state-in-effect -- 外部設定変更に応じた状態同期 */
   useEffect(() => {
     if (idleModeEnabled) {
       setIdleState('waiting')
@@ -300,7 +298,6 @@ export function useIdleMode({
       }
     }
   }, [idleModeEnabled, idleInterval])
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   // ----- タイマー処理 -----
   useEffect(() => {
@@ -328,7 +325,6 @@ export function useIdleMode({
   }, [idleModeEnabled, idleState])
 
   // ----- 発話トリガー（カウントダウン0以下で発火）-----
-  /* eslint-disable react-hooks/set-state-in-effect -- カウントダウン完了時の発話トリガー */
   useEffect(() => {
     if (
       secondsUntilNextSpeech <= 0 &&
@@ -345,7 +341,6 @@ export function useIdleMode({
     idleInterval,
     triggerSpeech,
   ])
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   // ----- chatLog変更の監視（ユーザー入力検知） -----
   useEffect(() => {

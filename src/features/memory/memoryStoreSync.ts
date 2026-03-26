@@ -50,7 +50,10 @@ export async function saveMessageToMemory(message: Message): Promise<void> {
  * @returns システムプロンプトに追加するコンテキスト文字列
  */
 export async function searchMemoryContext(query: string): Promise<string> {
-  return searchMemoryContextWithTimeout(query, DEFAULT_MEMORY_CONTEXT_TIMEOUT_MS)
+  return searchMemoryContextWithTimeout(
+    query,
+    DEFAULT_MEMORY_CONTEXT_TIMEOUT_MS
+  )
 }
 
 export async function searchMemoryContextWithTimeout(

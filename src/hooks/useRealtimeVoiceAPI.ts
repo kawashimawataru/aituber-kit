@@ -353,7 +353,6 @@ export function useRealtimeVoiceAPI(
   )
 
   // ----- 音声認識オブジェクトの初期化とイベントハンドラ設定 -----
-  /* eslint-disable react-hooks/set-state-in-effect -- 外部APIインスタンスの保持 */
   useEffect(() => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition
@@ -425,7 +424,6 @@ export function useRealtimeVoiceAPI(
     updateSpeechTimestamp,
     t,
   ])
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   // WebSocketの準備ができているかを確認
   const isWebSocketReady = useCallback(() => {

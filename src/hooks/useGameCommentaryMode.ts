@@ -3,7 +3,7 @@ import settingsStore from '@/features/stores/settings'
 import homeStore from '@/features/stores/home'
 import { speakCharacter } from '@/features/messages/speakCharacter'
 import { SpeakQueue } from '@/features/messages/speakQueue'
-import { Talk } from '@/features/messages/messages'
+import { Talk, splitSentence } from '@/features/messages/messages'
 import CaptureService from '@/features/gameCommentary/captureService'
 import {
   generateGameCommentary,
@@ -241,32 +241,45 @@ export function useGameCommentaryMode({
       setState('speaking')
       callbackRefs.current.onCommentaryStart?.(result)
 
-      // Talk オブジェクト作成
-      const talk: Talk = {
-        message: result.text,
-        emotion: result.emotion,
+      // テキストを文節分割して順番に発話
+      const sentences = splitSentence(result.text)
+      if (sentences.length === 0) {
+        isProcessingRef.current = false
+        setState('waiting')
+        scheduleNext()
+        return
       }
 
       // セッションIDを更新
       sessionIdRef.current = `game-commentary-${Date.now()}`
 
-      // 発話実行（完了ベース: 発話完了後に次回スケジュール）
-      speakCharacter(
-        sessionIdRef.current,
-        talk,
-        () => {
-          // onStart
-        },
-        () => {
-          // onComplete
-          isProcessingRef.current = false
-          callbackRefs.current.onCommentaryComplete?.()
-          if (isRunningRef.current) {
-            setState('waiting')
-            scheduleNext()
-          }
+      // 分割した文を順番に発話キューに投入
+      const lastIndex = sentences.length - 1
+      for (let i = 0; i < sentences.length; i++) {
+        const talk: Talk = {
+          message: sentences[i],
+          emotion: result.emotion,
         }
-      )
+
+        speakCharacter(
+          sessionIdRef.current,
+          talk,
+          () => {
+            // onStart
+          },
+          i === lastIndex
+            ? () => {
+                // 最後の文の完了時に次回スケジュール
+                isProcessingRef.current = false
+                callbackRefs.current.onCommentaryComplete?.()
+                if (isRunningRef.current) {
+                  setState('waiting')
+                  scheduleNext()
+                }
+              }
+            : undefined
+        )
+      }
     } catch (error) {
       console.error('ゲーム実況コメント生成エラー:', error)
       isProcessingRef.current = false

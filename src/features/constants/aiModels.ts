@@ -588,6 +588,7 @@ const serviceReasoningDefaults: Partial<
   xai: { efforts: ['low', 'high'], tokenBudget: false },
   groq: { efforts: ['low', 'medium', 'high'], tokenBudget: false },
   cohere: { efforts: [], tokenBudget: true },
+  ollama: { efforts: ['none', 'low', 'medium', 'high'], tokenBudget: false },
 }
 
 /**

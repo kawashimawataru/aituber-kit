@@ -795,6 +795,10 @@ const getInitialValuesFromEnv = (): SettingsState => ({
   gameCommentaryPromptTemplate:
     process.env.NEXT_PUBLIC_GAME_COMMENTARY_PROMPT_TEMPLATE ||
     DEFAULT_GAME_COMMENTARY_CONFIG.gameCommentaryPromptTemplate,
+  gameCommentaryBackgroundAnalysisPromptTemplate:
+    process.env
+      .NEXT_PUBLIC_GAME_COMMENTARY_BACKGROUND_ANALYSIS_PROMPT_TEMPLATE ||
+    DEFAULT_GAME_COMMENTARY_CONFIG.gameCommentaryBackgroundAnalysisPromptTemplate,
   gameCommentaryImageQuality:
     parseFloat(process.env.NEXT_PUBLIC_GAME_COMMENTARY_IMAGE_QUALITY || '') ||
     DEFAULT_GAME_COMMENTARY_CONFIG.gameCommentaryImageQuality,
@@ -807,6 +811,15 @@ const getInitialValuesFromEnv = (): SettingsState => ({
   gameCommentaryVideoDelay:
     parseInt(process.env.NEXT_PUBLIC_GAME_COMMENTARY_VIDEO_DELAY || '') ||
     DEFAULT_GAME_COMMENTARY_CONFIG.gameCommentaryVideoDelay,
+  gameCommentaryBackgroundAnalysisEnabled:
+    process.env.NEXT_PUBLIC_GAME_COMMENTARY_BACKGROUND_ANALYSIS_ENABLED ===
+      'true' ||
+    DEFAULT_GAME_COMMENTARY_CONFIG.gameCommentaryBackgroundAnalysisEnabled,
+  gameCommentaryBackgroundAnalysisInterval:
+    parseInt(
+      process.env.NEXT_PUBLIC_GAME_COMMENTARY_BACKGROUND_ANALYSIS_INTERVAL || ''
+    ) ||
+    DEFAULT_GAME_COMMENTARY_CONFIG.gameCommentaryBackgroundAnalysisInterval,
 
   // Live2D settings
   neutralEmotions: process.env.NEXT_PUBLIC_NEUTRAL_EMOTIONS?.split(',') || [],
@@ -879,9 +892,21 @@ const migratePersistedSettings = (
     migrated.gameCommentaryPromptTemplate =
       DEFAULT_GAME_COMMENTARY_CONFIG.gameCommentaryPromptTemplate
   }
+  if (migrated.gameCommentaryBackgroundAnalysisPromptTemplate === undefined) {
+    migrated.gameCommentaryBackgroundAnalysisPromptTemplate =
+      DEFAULT_GAME_COMMENTARY_CONFIG.gameCommentaryBackgroundAnalysisPromptTemplate
+  }
   if (migrated.gameCommentaryVideoDelay === undefined) {
     migrated.gameCommentaryVideoDelay =
       DEFAULT_GAME_COMMENTARY_CONFIG.gameCommentaryVideoDelay
+  }
+  if (migrated.gameCommentaryBackgroundAnalysisEnabled === undefined) {
+    migrated.gameCommentaryBackgroundAnalysisEnabled =
+      DEFAULT_GAME_COMMENTARY_CONFIG.gameCommentaryBackgroundAnalysisEnabled
+  }
+  if (migrated.gameCommentaryBackgroundAnalysisInterval === undefined) {
+    migrated.gameCommentaryBackgroundAnalysisInterval =
+      DEFAULT_GAME_COMMENTARY_CONFIG.gameCommentaryBackgroundAnalysisInterval
   }
   delete migrated.gameCommentaryVideoBufferWidth
 
@@ -1137,10 +1162,16 @@ const settingsStore = create<SettingsState>()(
         gameCommentaryCaptureInterval: state.gameCommentaryCaptureInterval,
         gameCommentaryContextCount: state.gameCommentaryContextCount,
         gameCommentaryPromptTemplate: state.gameCommentaryPromptTemplate,
+        gameCommentaryBackgroundAnalysisPromptTemplate:
+          state.gameCommentaryBackgroundAnalysisPromptTemplate,
         gameCommentaryImageQuality: state.gameCommentaryImageQuality,
         gameCommentaryResizeWidth: state.gameCommentaryResizeWidth,
         gameCommentarySaveToChat: state.gameCommentarySaveToChat,
         gameCommentaryVideoDelay: state.gameCommentaryVideoDelay,
+        gameCommentaryBackgroundAnalysisEnabled:
+          state.gameCommentaryBackgroundAnalysisEnabled,
+        gameCommentaryBackgroundAnalysisInterval:
+          state.gameCommentaryBackgroundAnalysisInterval,
       }),
     })
   )

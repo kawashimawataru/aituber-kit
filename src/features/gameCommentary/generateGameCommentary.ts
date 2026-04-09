@@ -11,6 +11,59 @@ export interface CommentaryHistoryEntry {
   sceneDescription: string
 }
 
+export interface BackgroundSceneAnalysisEntry {
+  summary: string
+}
+
+export function buildGameCommentaryMessages(
+  commentaryHistory: CommentaryHistoryEntry[],
+  imageData: string,
+  recentChatMessages?: Array<{ role: string; content: string }>,
+  backgroundSceneAnalyses: BackgroundSceneAnalysisEntry[] = []
+): Message[] {
+  const ss = settingsStore.getState()
+  const characterPrompt = ss.systemPrompt || ''
+  const commentaryPrompt = ss.gameCommentaryPromptTemplate || ''
+
+  const systemPrompt = characterPrompt + '\n\n' + commentaryPrompt
+  const messages: Message[] = [{ role: 'system', content: systemPrompt }]
+
+  if (recentChatMessages && recentChatMessages.length > 0) {
+    for (const msg of recentChatMessages) {
+      messages.push({ role: msg.role, content: msg.content })
+    }
+  }
+
+  for (const history of commentaryHistory) {
+    if (history.sceneDescription) {
+      messages.push({
+        role: 'user',
+        content: `[前回の画面状況] ${history.sceneDescription}`,
+      })
+    }
+    messages.push({ role: 'assistant', content: history.commentary })
+  }
+
+  if (backgroundSceneAnalyses.length > 0) {
+    messages.push({
+      role: 'user',
+      content: `[発話中の補助的な画面解析メモ・古い順]\n${backgroundSceneAnalyses
+        .map((analysis, index) => `${index + 1}. ${analysis.summary}`)
+        .join('\n')}`,
+    })
+  }
+
+  messages.push({
+    role: 'user',
+    content: [
+      { type: 'text', text: '画面の状況を実況してください。' },
+      { type: 'image', image: imageData },
+    ],
+  })
+
+  return messages
+}
+
 /**
  * ゲーム実況コメントを生成する
  *
@@ -21,48 +74,19 @@ export interface CommentaryHistoryEntry {
 export async function generateGameCommentary(
   commentaryHistory: CommentaryHistoryEntry[],
   imageData: string,
-  recentChatMessages?: Array<{ role: string; content: string }>
+  recentChatMessages?: Array<{ role: string; content: string }>,
+  backgroundSceneAnalyses: BackgroundSceneAnalysisEntry[] = []
 ): Promise<{
   text: string
   emotion: EmotionType
   sceneDescription: string
 } | null> {
-  const ss = settingsStore.getState()
-  const characterPrompt = ss.systemPrompt || ''
-  const commentaryPrompt = ss.gameCommentaryPromptTemplate || ''
-
-  const systemPrompt = characterPrompt + '\n\n' + commentaryPrompt
-
-  const messages: Message[] = [{ role: 'system', content: systemPrompt }]
-
-  // chatLogの直近メッセージを文脈として追加（視聴者コメントを把握）
-  if (recentChatMessages && recentChatMessages.length > 0) {
-    for (const msg of recentChatMessages) {
-      messages.push({ role: msg.role, content: msg.content })
-    }
-  }
-
-  // 実況履歴を文脈メッセージとして追加（情景描写 + 実況テキストのペア）
-  for (const history of commentaryHistory) {
-    // 情景描写がある場合のみユーザーメッセージとして追加
-    if (history.sceneDescription) {
-      messages.push({
-        role: 'user',
-        content: `[前回の画面状況] ${history.sceneDescription}`,
-      })
-    }
-    // 実況テキストをアシスタントメッセージとして追加
-    messages.push({ role: 'assistant', content: history.commentary })
-  }
-
-  // 現在フレームのキャプチャ画像をuserメッセージに添付
-  messages.push({
-    role: 'user',
-    content: [
-      { type: 'text', text: '画面の状況を実況してください。' },
-      { type: 'image', image: imageData },
-    ],
-  })
+  const messages = buildGameCommentaryMessages(
+    commentaryHistory,
+    imageData,
+    recentChatMessages,
+    backgroundSceneAnalyses
+  )
 
   try {
     const stream = await getAIChatResponseStream(messages)
@@ -102,7 +126,7 @@ export async function generateGameCommentary(
  *
  * [scene]がない場合は空文字列を返す（後方互換性）
  */
-function parseCommentaryResponse(rawText: string): {
+export function parseCommentaryResponse(rawText: string): {
   text: string
   emotion: EmotionType
   sceneDescription: string

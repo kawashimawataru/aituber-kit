@@ -9,8 +9,10 @@ import settingsStore from '@/features/stores/settings'
 import homeStore from '@/features/stores/home'
 import { ToggleSwitch } from '../toggleSwitch'
 import {
+  clampBackgroundAnalysisInterval,
   clampCaptureInterval,
   clampContextCount,
+  GAME_COMMENTARY_BACKGROUND_ANALYSIS_INTERVAL,
   GAME_COMMENTARY_INTERVAL,
   GAME_COMMENTARY_CONTEXT_COUNT,
   GAME_COMMENTARY_VIDEO_DELAY,
@@ -38,6 +40,9 @@ const GameCommentarySettings = () => {
   const gameCommentaryPromptTemplate = settingsStore(
     (s) => s.gameCommentaryPromptTemplate
   )
+  const gameCommentaryBackgroundAnalysisPromptTemplate = settingsStore(
+    (s) => s.gameCommentaryBackgroundAnalysisPromptTemplate
+  )
   const gameCommentaryImageQuality = settingsStore(
     (s) => s.gameCommentaryImageQuality
   )
@@ -49,6 +54,12 @@ const GameCommentarySettings = () => {
   )
   const gameCommentaryVideoDelay = settingsStore(
     (s) => s.gameCommentaryVideoDelay
+  )
+  const gameCommentaryBackgroundAnalysisEnabled = settingsStore(
+    (s) => s.gameCommentaryBackgroundAnalysisEnabled
+  )
+  const gameCommentaryBackgroundAnalysisInterval = settingsStore(
+    (s) => s.gameCommentaryBackgroundAnalysisInterval
   )
 
   // 排他制御による無効化判定
@@ -319,6 +330,86 @@ const GameCommentarySettings = () => {
                 settingsStore.setState({ gameCommentarySaveToChat: v })
               }
             />
+          </div>
+        </div>
+
+        {/* 発話中の補助画像解析 */}
+        <div className="my-6">
+          <div className="my-4 text-xl font-bold">
+            {t('GameCommentary.BackgroundAnalysis')}
+          </div>
+          <div className="my-2 text-sm whitespace-pre-wrap">
+            {t('GameCommentary.BackgroundAnalysisInfo')}
+          </div>
+          <div className="my-2">
+            <ToggleSwitch
+              enabled={gameCommentaryBackgroundAnalysisEnabled}
+              onChange={(v) =>
+                settingsStore.setState({
+                  gameCommentaryBackgroundAnalysisEnabled: v,
+                })
+              }
+            />
+          </div>
+          <div className="my-6">
+            <div className="my-4 text-xl font-bold">
+              {t('GameCommentary.BackgroundAnalysisPromptTemplate')}
+            </div>
+            <div className="my-2 text-sm whitespace-pre-wrap">
+              {t('GameCommentary.BackgroundAnalysisPromptTemplateInfo')}
+            </div>
+            <textarea
+              value={gameCommentaryBackgroundAnalysisPromptTemplate}
+              onChange={(e) =>
+                settingsStore.setState({
+                  gameCommentaryBackgroundAnalysisPromptTemplate:
+                    e.target.value,
+                })
+              }
+              className="w-full h-24 px-4 py-2 bg-white border border-gray-300 rounded-lg resize-y"
+              disabled={!gameCommentaryBackgroundAnalysisEnabled}
+            />
+          </div>
+          <div className="my-6">
+            <div className="my-4 text-xl font-bold">
+              {t('GameCommentary.BackgroundAnalysisInterval')}
+            </div>
+            <div className="my-2 text-sm whitespace-pre-wrap">
+              {t('GameCommentary.BackgroundAnalysisIntervalInfo', {
+                min: GAME_COMMENTARY_BACKGROUND_ANALYSIS_INTERVAL.MIN,
+                max: GAME_COMMENTARY_BACKGROUND_ANALYSIS_INTERVAL.MAX,
+              })}
+            </div>
+            <div className="my-4 flex items-center gap-4">
+              <input
+                type="range"
+                min={GAME_COMMENTARY_BACKGROUND_ANALYSIS_INTERVAL.MIN}
+                max={GAME_COMMENTARY_BACKGROUND_ANALYSIS_INTERVAL.MAX}
+                step={1}
+                value={gameCommentaryBackgroundAnalysisInterval}
+                onChange={(e) =>
+                  settingsStore.setState({
+                    gameCommentaryBackgroundAnalysisInterval: parseInt(
+                      e.target.value,
+                      10
+                    ),
+                  })
+                }
+                onBlur={(e) =>
+                  settingsStore.setState({
+                    gameCommentaryBackgroundAnalysisInterval:
+                      clampBackgroundAnalysisInterval(
+                        parseInt(e.target.value, 10)
+                      ),
+                  })
+                }
+                className="flex-1"
+                disabled={!gameCommentaryBackgroundAnalysisEnabled}
+              />
+              <span className="w-16 text-right">
+                {gameCommentaryBackgroundAnalysisInterval}s
+              </span>
+            </div>
           </div>
         </div>
       </div>

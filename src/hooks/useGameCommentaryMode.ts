@@ -5,10 +5,13 @@ import { speakCharacter } from '@/features/messages/speakCharacter'
 import { SpeakQueue } from '@/features/messages/speakQueue'
 import { Talk, splitSentence } from '@/features/messages/messages'
 import CaptureService from '@/features/gameCommentary/captureService'
+import { analyzeGameCommentaryScene } from '@/features/gameCommentary/analyzeGameCommentaryScene'
 import {
   generateGameCommentary,
+  BackgroundSceneAnalysisEntry,
   CommentaryHistoryEntry,
 } from '@/features/gameCommentary/generateGameCommentary'
+import { GAME_COMMENTARY_BACKGROUND_ANALYSIS } from '@/features/gameCommentary/gameCommentaryTypes'
 
 /**
  * ゲーム実況モードの状態型
@@ -59,6 +62,10 @@ export function useGameCommentaryMode({
   const gameCommentaryContextCount = ss.gameCommentaryContextCount ?? 5
   const gameCommentaryImageQuality = ss.gameCommentaryImageQuality || 0.7
   const gameCommentaryResizeWidth = ss.gameCommentaryResizeWidth || 1024
+  const gameCommentaryBackgroundAnalysisEnabled =
+    ss.gameCommentaryBackgroundAnalysisEnabled === true
+  const gameCommentaryBackgroundAnalysisInterval =
+    ss.gameCommentaryBackgroundAnalysisInterval ?? 2
 
   // settingsStoreの変更を監視して再レンダリングをトリガー
   const [, forceUpdate] = useState(0)
@@ -81,13 +88,22 @@ export function useGameCommentaryMode({
   // ----- Refs -----
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const backgroundAnalysisTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null)
   const sessionIdRef = useRef<string | null>(null)
   const commentaryHistoryRef = useRef<CommentaryHistoryEntry[]>([])
+  const backgroundSceneAnalysesRef = useRef<BackgroundSceneAnalysisEntry[]>([])
   const isProcessingRef = useRef(false)
+  const isBackgroundAnalysisInFlightRef = useRef(false)
   const isRunningRef = useRef(isRunning)
   isRunningRef.current = isRunning
+  const stateRef = useRef<GameCommentaryState>(state)
+  stateRef.current = state
   const captureIntervalRef = useRef(gameCommentaryCaptureInterval)
   captureIntervalRef.current = gameCommentaryCaptureInterval
+  const backgroundAnalysisGenerationRef = useRef(0)
+  const queueNextBackgroundAnalysisRef = useRef<() => void>(() => {})
 
   // Callback refs to avoid stale closures
   const callbackRefs = useRef({
@@ -147,6 +163,107 @@ export function useGameCommentaryMode({
     }
   }, [])
 
+  const clearBackgroundAnalysisTimer = useCallback(() => {
+    if (backgroundAnalysisTimerRef.current) {
+      clearTimeout(backgroundAnalysisTimerRef.current)
+      backgroundAnalysisTimerRef.current = null
+    }
+  }, [])
+
+  const resetBackgroundSceneAnalyses = useCallback(() => {
+    backgroundAnalysisGenerationRef.current += 1
+    backgroundSceneAnalysesRef.current = []
+  }, [])
+
+  const pushBackgroundSceneAnalysis = useCallback((summary: string) => {
+    if (!summary) return
+
+    const existing =
+      backgroundSceneAnalysesRef.current[
+        backgroundSceneAnalysesRef.current.length - 1
+      ]
+    if (existing?.summary === summary) return
+
+    backgroundSceneAnalysesRef.current.push({ summary })
+    if (
+      backgroundSceneAnalysesRef.current.length >
+      GAME_COMMENTARY_BACKGROUND_ANALYSIS.MAX_BUFFERED_ITEMS
+    ) {
+      backgroundSceneAnalysesRef.current =
+        backgroundSceneAnalysesRef.current.slice(
+          -GAME_COMMENTARY_BACKGROUND_ANALYSIS.MAX_BUFFERED_ITEMS
+        )
+    }
+  }, [])
+
+  const runBackgroundSceneAnalysis = useCallback(async () => {
+    if (!isRunningRef.current) return
+    if (!gameCommentaryBackgroundAnalysisEnabled) return
+    if (stateRef.current !== 'speaking') return
+    if (isBackgroundAnalysisInFlightRef.current) return
+
+    const captureService = CaptureService.getInstance()
+    if (!captureService.isAvailable()) return
+
+    const maxWidth =
+      gameCommentaryResizeWidth > 0
+        ? Math.min(
+            gameCommentaryResizeWidth,
+            GAME_COMMENTARY_BACKGROUND_ANALYSIS.RESIZE_WIDTH
+          )
+        : GAME_COMMENTARY_BACKGROUND_ANALYSIS.RESIZE_WIDTH
+    const quality = Math.min(
+      gameCommentaryImageQuality,
+      GAME_COMMENTARY_BACKGROUND_ANALYSIS.IMAGE_QUALITY
+    )
+    const imageData = captureService.captureFrame(maxWidth, quality)
+
+    if (!imageData) return
+
+    isBackgroundAnalysisInFlightRef.current = true
+    const generationAtStart = backgroundAnalysisGenerationRef.current
+
+    try {
+      const summary = await analyzeGameCommentaryScene(imageData)
+      if (!summary) return
+      if (generationAtStart !== backgroundAnalysisGenerationRef.current) return
+      if (!isRunningRef.current || stateRef.current !== 'speaking') return
+      pushBackgroundSceneAnalysis(summary)
+    } finally {
+      isBackgroundAnalysisInFlightRef.current = false
+      if (isRunningRef.current && stateRef.current === 'speaking') {
+        queueNextBackgroundAnalysisRef.current()
+      }
+    }
+  }, [
+    gameCommentaryBackgroundAnalysisEnabled,
+    gameCommentaryImageQuality,
+    gameCommentaryResizeWidth,
+    pushBackgroundSceneAnalysis,
+  ])
+
+  useEffect(() => {
+    queueNextBackgroundAnalysisRef.current = () => {
+      clearBackgroundAnalysisTimer()
+      if (
+        !isRunningRef.current ||
+        !gameCommentaryBackgroundAnalysisEnabled ||
+        stateRef.current !== 'speaking'
+      ) {
+        return
+      }
+
+      backgroundAnalysisTimerRef.current = setTimeout(() => {
+        void runBackgroundSceneAnalysis()
+      }, gameCommentaryBackgroundAnalysisInterval * 1000)
+    }
+  }, [
+    clearBackgroundAnalysisTimer,
+    gameCommentaryBackgroundAnalysisEnabled,
+    gameCommentaryBackgroundAnalysisInterval,
+    runBackgroundSceneAnalysis,
+  ])
+
   // ----- 次回キャプチャのスケジュール -----
   const scheduleNext = useCallback(() => {
     clearTimers()
@@ -198,6 +315,9 @@ export function useGameCommentaryMode({
 
     // AI実況コメント生成
     try {
+      const backgroundSceneAnalyses = backgroundSceneAnalysesRef.current
+      resetBackgroundSceneAnalyses()
+
       // chatLogから直近メッセージを取得（視聴者コメントとの文脈共有）
       const chatLog = homeStore.getState().chatLog
       const recentMessages = chatLog
@@ -211,7 +331,8 @@ export function useGameCommentaryMode({
       const result = await generateGameCommentary(
         commentaryHistoryRef.current,
         imageData,
-        recentMessages
+        recentMessages,
+        backgroundSceneAnalyses
       )
 
       if (!result) {
@@ -309,12 +430,14 @@ export function useGameCommentaryMode({
   // ----- 実況停止 -----
   const stopCommentary = useCallback(() => {
     clearTimers()
+    clearBackgroundAnalysisTimer()
+    resetBackgroundSceneAnalyses()
     isProcessingRef.current = false
     SpeakQueue.stopAll()
     setState('waiting')
     setSecondsUntilNextCapture(captureIntervalRef.current)
     callbackRefs.current.onCommentaryInterrupted?.()
-  }, [clearTimers])
+  }, [clearBackgroundAnalysisTimer, clearTimers, resetBackgroundSceneAnalyses])
 
   // ----- 有効/無効の監視 -----
   useEffect(() => {
@@ -325,15 +448,47 @@ export function useGameCommentaryMode({
     } else {
       setState('disabled')
       clearTimers()
+      clearBackgroundAnalysisTimer()
       SpeakQueue.stopAll()
       commentaryHistoryRef.current = []
+      resetBackgroundSceneAnalyses()
       isProcessingRef.current = false
     }
 
     return () => {
       clearTimers()
+      clearBackgroundAnalysisTimer()
     }
-  }, [isRunning, clearTimers, scheduleNext])
+  }, [
+    isRunning,
+    clearBackgroundAnalysisTimer,
+    clearTimers,
+    resetBackgroundSceneAnalyses,
+    scheduleNext,
+  ])
+
+  // ----- 発話中のバックグラウンド解析 -----
+  useEffect(() => {
+    if (
+      !isRunning ||
+      !gameCommentaryBackgroundAnalysisEnabled ||
+      state !== 'speaking'
+    ) {
+      clearBackgroundAnalysisTimer()
+      return
+    }
+
+    queueNextBackgroundAnalysisRef.current()
+
+    return () => {
+      clearBackgroundAnalysisTimer()
+    }
+  }, [
+    isRunning,
+    state,
+    clearBackgroundAnalysisTimer,
+    gameCommentaryBackgroundAnalysisEnabled,
+  ])
 
   // ----- chatLog変更の監視（ユーザー入力検知） -----
   useEffect(() => {

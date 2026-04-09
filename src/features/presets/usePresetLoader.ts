@@ -32,6 +32,10 @@ const PROMPT_PRESETS: { key: string; filename: string }[] = [
     key: 'gameCommentaryPromptTemplate',
     filename: 'game-commentary-prompt.txt',
   },
+  {
+    key: 'gameCommentaryBackgroundAnalysisPromptTemplate',
+    filename: 'game-commentary-background-analysis-prompt.txt',
+  },
 ]
 
 export function usePresetLoader(): void {

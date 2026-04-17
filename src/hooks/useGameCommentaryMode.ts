@@ -499,12 +499,12 @@ export function useGameCommentaryMode({
         // ユーザー入力があったらタイマーリセット
         const latestMsg = hState.chatLog[hState.chatLog.length - 1]
         if (latestMsg?.role === 'user') {
-          resetTimer()
-
           // 発話中の場合は停止
           if (state === 'speaking') {
             stopCommentary()
           }
+
+          resetTimer()
         }
       }
     })

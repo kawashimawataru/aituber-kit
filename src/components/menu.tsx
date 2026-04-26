@@ -260,6 +260,7 @@ export const Menu = () => {
                     iconName="24/Settings"
                     isProcessing={false}
                     onClick={() => setShowSettings(true)}
+                    data-testid="open-settings-button"
                   ></IconButton>
                 </div>
               )}
@@ -282,6 +283,7 @@ export const Menu = () => {
                   iconName="screen-share"
                   isProcessing={false}
                   onClick={toggleCapture}
+                  data-testid="capture-toggle-button"
                 />
               </div>
               <div className="order-4">
@@ -332,6 +334,8 @@ export const Menu = () => {
                         youtubePlaying: !youtubePlaying,
                       })
                     }
+                    aria-pressed={youtubePlaying}
+                    data-testid="youtube-play-toggle-button"
                   />
                 </div>
               )}
@@ -343,6 +347,8 @@ export const Menu = () => {
                     }
                     isProcessing={false}
                     onClick={toggleGameCommentary}
+                    aria-pressed={gameCommentaryPlaying}
+                    data-testid="game-commentary-play-toggle-button"
                   />
                 </div>
               )}

@@ -141,6 +141,7 @@ const GameCommentarySettings = () => {
                 )
               }
               disabled={isDisabledByExclusion}
+              testId="game-commentary-enabled-toggle"
             />
           </div>
         </div>
@@ -163,6 +164,7 @@ const GameCommentarySettings = () => {
           </div>
           <div className="my-4 flex items-center gap-4">
             <input
+              data-testid="game-commentary-capture-interval-input"
               type="range"
               min={GAME_COMMENTARY_INTERVAL.MIN}
               max={GAME_COMMENTARY_INTERVAL.MAX}
@@ -194,6 +196,7 @@ const GameCommentarySettings = () => {
           </div>
           <div className="my-4 flex items-center gap-4">
             <input
+              data-testid="game-commentary-video-delay-input"
               type="range"
               min={GAME_COMMENTARY_VIDEO_DELAY.MIN}
               max={GAME_COMMENTARY_VIDEO_DELAY.MAX}
@@ -227,6 +230,7 @@ const GameCommentarySettings = () => {
           </div>
           <div className="my-4 flex items-center gap-4">
             <input
+              data-testid="game-commentary-image-quality-input"
               type="range"
               min={0.3}
               max={1.0}
@@ -255,6 +259,7 @@ const GameCommentarySettings = () => {
           </div>
           <div className="my-4">
             <select
+              data-testid="game-commentary-resize-width-select"
               value={gameCommentaryResizeWidth}
               onChange={(e) =>
                 settingsStore.setState({
@@ -287,6 +292,7 @@ const GameCommentarySettings = () => {
           </div>
           <div className="my-4 flex items-center gap-2">
             <input
+              data-testid="game-commentary-context-count-input"
               type="number"
               min={GAME_COMMENTARY_CONTEXT_COUNT.MIN}
               max={GAME_COMMENTARY_CONTEXT_COUNT.MAX}
@@ -321,6 +327,7 @@ const GameCommentarySettings = () => {
             {t('GameCommentary.PromptTemplateInfo')}
           </div>
           <textarea
+            data-testid="game-commentary-prompt-template-input"
             value={gameCommentaryPromptTemplate}
             onChange={(e) =>
               settingsStore.setState({
@@ -345,6 +352,7 @@ const GameCommentarySettings = () => {
               onChange={(v) =>
                 settingsStore.setState({ gameCommentarySaveToChat: v })
               }
+              testId="game-commentary-save-to-chat-toggle"
             />
           </div>
         </div>
@@ -365,6 +373,7 @@ const GameCommentarySettings = () => {
                   gameCommentaryBackgroundAnalysisEnabled: v,
                 })
               }
+              testId="game-commentary-background-analysis-toggle"
             />
           </div>
           <div className="my-6">
@@ -375,6 +384,7 @@ const GameCommentarySettings = () => {
               {t('GameCommentary.BackgroundAnalysisPromptTemplateInfo')}
             </div>
             <textarea
+              data-testid="game-commentary-background-prompt-template-input"
               value={gameCommentaryBackgroundAnalysisPromptTemplate}
               onChange={(e) =>
                 settingsStore.setState({
@@ -398,6 +408,7 @@ const GameCommentarySettings = () => {
             </div>
             <div className="my-4 flex items-center gap-4">
               <input
+                data-testid="game-commentary-background-interval-input"
                 type="range"
                 min={GAME_COMMENTARY_BACKGROUND_ANALYSIS_INTERVAL.MIN}
                 max={GAME_COMMENTARY_BACKGROUND_ANALYSIS_INTERVAL.MAX}

@@ -44,6 +44,7 @@ const Header = ({ onClickClose }: Pick<Props, 'onClickClose'>) => {
           iconName="24/Close"
           isProcessing={false}
           onClick={onClickClose}
+          data-testid="close-settings-button"
         ></IconButton>
       </div>
     </>
@@ -230,6 +231,7 @@ const Main = () => {
                   <button
                     className={`flex items-center py-2 px-4 rounded-lg w-full text-left ${activeTab === tab.key ? 'text-theme bg-primary' : ''}`}
                     onClick={() => setActiveTab(tab.key)}
+                    data-testid={`settings-tab-${tab.key}`}
                   >
                     <div
                       className={`w-5 h-5 mr-2 ${
@@ -291,6 +293,7 @@ const Main = () => {
                     key={tab.key}
                     className={`flex items-center w-full py-3 px-4 text-left hover:bg-gray-50 ${activeTab === tab.key ? 'bg-primary text-theme' : ''}`}
                     onClick={() => setActiveTab(tab.key)}
+                    data-testid={`settings-tab-${tab.key}`}
                   >
                     <div
                       className={`w-5 h-5 mr-2 ${
@@ -313,7 +316,10 @@ const Main = () => {
           </div>
 
           {/* タブコンテンツ */}
-          <div className="p-4 sm:p-6 bg-gray-400 bg-opacity-20 text-medium rounded-lg w-full">
+          <div
+            className="p-4 sm:p-6 bg-gray-400 bg-opacity-20 text-medium rounded-lg w-full"
+            data-testid="settings-panel"
+          >
             {renderTabContent()}
           </div>
         </div>

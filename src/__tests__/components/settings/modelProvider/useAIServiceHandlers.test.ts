@@ -54,5 +54,6 @@ describe('useAIServiceHandlers', () => {
     expect(mockedSettingsStore.setState).toHaveBeenCalledWith({
       enableMultiModal: false,
     })
+    expect(mockedSettingsStore.setState).toHaveBeenCalledTimes(1)
   })
 })

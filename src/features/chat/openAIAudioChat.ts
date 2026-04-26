@@ -8,7 +8,10 @@ import {
   AudioBufferManager,
 } from '@/utils/audioBufferManager'
 import { messageSelectors } from '../messages/messageSelectors'
-import { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
+import {
+  ChatCompletionCreateParamsStreaming,
+  ChatCompletionMessageParam,
+} from 'openai/resources/chat/completions'
 import { AudioModeModel, RealtimeAPIModeVoice } from '../constants/settings'
 import { defaultModels } from '../constants/aiModels'
 import type { AIChatResponseStreamOptions } from './aiChatFactory'
@@ -24,7 +27,7 @@ export async function getOpenAIAudioChatResponseStream(
   })
 
   try {
-    const request = {
+    const request: ChatCompletionCreateParamsStreaming = {
       model: (ss.selectAIModel as AudioModeModel) || defaultModels.openaiAudio,
       messages: messageSelectors.getAudioMessages(
         messages
@@ -35,7 +38,7 @@ export async function getOpenAIAudioChatResponseStream(
         voice: ss.audioModeVoice as RealtimeAPIModeVoice,
         format: 'pcm16',
       },
-    } as const
+    }
 
     const response = options.signal
       ? await openai.chat.completions.create(request, {

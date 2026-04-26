@@ -403,6 +403,21 @@ describe('useGameCommentaryMode', () => {
     expect(mockCaptureFrame).toHaveBeenCalledWith(0, 0.7)
   })
 
+  it('preserves zero image quality when capturing', async () => {
+    setupSettingsState({ gameCommentaryImageQuality: 0 })
+
+    renderHook(() => useGameCommentaryMode({}))
+
+    await act(async () => {
+      jest.advanceTimersByTime(5000)
+      await Promise.resolve()
+    })
+
+    await flushAsync()
+
+    expect(mockCaptureFrame).toHaveBeenCalledWith(1024, 0)
+  })
+
   it('uses the latest commentary callback when settings change before the scheduled capture', async () => {
     renderHook(() => useGameCommentaryMode({}))
 
@@ -423,6 +438,35 @@ describe('useGameCommentaryMode', () => {
     await flushAsync()
 
     expect(mockCaptureFrame).toHaveBeenCalledWith(0, 0.7)
+  })
+
+  it('reschedules the waiting timer when capture interval changes', async () => {
+    renderHook(() => useGameCommentaryMode({}))
+
+    await act(async () => {
+      settingsState = {
+        ...settingsState,
+        gameCommentaryCaptureInterval: 10,
+      }
+      settingsSubscriber?.()
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      jest.advanceTimersByTime(9999)
+      await Promise.resolve()
+    })
+
+    expect(mockGenerateGameCommentary).not.toHaveBeenCalled()
+
+    await act(async () => {
+      jest.advanceTimersByTime(1)
+      await Promise.resolve()
+    })
+
+    await flushAsync()
+
+    expect(mockGenerateGameCommentary).toHaveBeenCalledTimes(1)
   })
 
   it('uses a runtime lower bound for background analysis interval', async () => {

@@ -63,7 +63,7 @@ export function useGameCommentaryMode({
   const gameCommentaryPlaying = ss.gameCommentaryPlaying
   const gameCommentaryCaptureInterval = ss.gameCommentaryCaptureInterval ?? 5
   const gameCommentaryContextCount = ss.gameCommentaryContextCount ?? 5
-  const gameCommentaryImageQuality = ss.gameCommentaryImageQuality || 0.7
+  const gameCommentaryImageQuality = ss.gameCommentaryImageQuality ?? 0.7
   const gameCommentaryResizeWidth = ss.gameCommentaryResizeWidth ?? 1024
   const gameCommentaryBackgroundAnalysisEnabled =
     ss.gameCommentaryBackgroundAnalysisEnabled === true
@@ -72,12 +72,6 @@ export function useGameCommentaryMode({
 
   // settingsStoreの変更を監視して再レンダリングをトリガー
   const [, forceUpdate] = useState(0)
-  useEffect(() => {
-    const unsubscribe = settingsStore.subscribe(() => {
-      forceUpdate((n) => n + 1)
-    })
-    return unsubscribe
-  }, [])
 
   // ----- 状態 -----
   const isRunning = gameCommentaryEnabled && gameCommentaryPlaying
@@ -312,6 +306,28 @@ export function useGameCommentaryMode({
       triggerCommentaryRef.current()
     }, interval * 1000)
   }, [clearTimers, getEffectiveCaptureInterval])
+
+  useEffect(() => {
+    const unsubscribe = settingsStore.subscribe(() => {
+      const nextCaptureInterval =
+        settingsStore.getState().gameCommentaryCaptureInterval ?? 5
+      const captureIntervalChanged =
+        nextCaptureInterval !== captureIntervalRef.current
+
+      captureIntervalRef.current = nextCaptureInterval
+      forceUpdate((n) => n + 1)
+
+      if (
+        captureIntervalChanged &&
+        isRunningRef.current &&
+        stateRef.current === 'waiting' &&
+        !isProcessingRef.current
+      ) {
+        scheduleNext()
+      }
+    })
+    return unsubscribe
+  }, [scheduleNext])
 
   // ----- 実況トリガー -----
   const triggerCommentary = useCallback(async () => {

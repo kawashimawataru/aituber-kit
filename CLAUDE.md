@@ -270,6 +270,25 @@ description, based, character, ai, voice, speechInput, youtube, slide, images, m
 - **デモモード**: `demoMode.ts` によるデモモード判定機能あり
 - **ストアマイグレーション**: `settingsStore` の `onRehydrateStorage` でOpenAIモデル名マイグレーション等を実行
 
+## 共演配信・Neuro 様方向の開発（自律作業用）
+
+計画と進捗は **`docs/project/`** と **`docs/dev-log/`** で管理する（単一の `development-roadmap-ja.md` は移行済みリダイレクト）。
+
+### エージェントが作業するときの手順
+
+1. **[docs/dev-log/STATUS.md](docs/dev-log/STATUS.md)** — 現在の Phase・次タスク・ブロッカー
+2. **[docs/project/README.md](docs/project/README.md)** — ワークフロー・ドキュメントマップ
+3. 対象 **[docs/project/phases/phase-*.md](docs/project/phases/)** — 実装するタスク ID
+4. 終了時: **`docs/dev-log/YYYY-MM-DD.md`** に記録し **STATUS.md を更新**
+
+### ディレクトリ
+
+- `docs/project/` — ビジョン、アーキテクチャ、現状調査、フェーズ別タスク、マトリクス
+- `docs/dev-log/` — 日付ログ + STATUS（常に最新）
+- `docs/README.md` — 索引
+
+計画の大幅変更や調査結果は、該当する `project/` ファイルも更新すること。
+
 ## ライセンスについて
 
 - v2.0.0以降は独自ライセンス

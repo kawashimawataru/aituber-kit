@@ -9,6 +9,7 @@
  * L3: 事後非言語（笑い SE / 息）
  */
 
+import { VRMExpressionPresetName } from '@pixiv/three-vrm'
 import { playSE, getLaughSEPath } from '@/utils/sePlayer'
 import homeStore from '@/features/stores/home'
 import { speakCharacter } from '@/features/messages/speakCharacter'
@@ -94,9 +95,18 @@ export function scheduleL1Reaction(inputText: string): void {
 }
 
 /**
- * Phase 4.5-3: 笑い SE を即時再生する（L3 事後非言語）
+ * Phase 4.5-3 / 4.5-6: 笑い SE を再生する（L3 事後非言語）
+ * 表情を 100ms 先行させてから SE を鳴らす
  */
 export async function playLaughSE(type: LaughType): Promise<void> {
+  // 表情先行（4.5-6）: happy 表情を SE より先に適用
+  const viewer = homeStore.getState().viewer
+  if (viewer?.model?.emoteController) {
+    viewer.model.emoteController.playEmotion(
+      'happy' as VRMExpressionPresetName
+    )
+    await new Promise<void>((resolve) => setTimeout(resolve, 100))
+  }
   await playSE(getLaughSEPath(type), 0.7)
 }
 

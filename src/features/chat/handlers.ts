@@ -25,6 +25,7 @@ import {
 import { fireStunt } from '@/features/staging/stuntScheduler'
 import type { StuntId } from '@/features/staging/stuntTypes'
 import { recordComment } from '@/features/chat/situationModel'
+import { applyEmotionBackground } from '@/features/staging/emotionBg'
 
 // セッションIDを生成する関数
 const generateSessionId = () => generateMessageId()
@@ -255,6 +256,9 @@ const handleSpeakAndStateUpdate = (
   const emotion = emotionTag.includes('[')
     ? (emotionTag.slice(1, -1).toLowerCase() as EmotionType)
     : 'neutral'
+
+  // 感情連動背景変更（backgroundChangeEnabled が ON の時のみ）
+  if (emotionTag) void applyEmotionBackground(emotionTag)
 
   // 発話不要/不可能な文字列だった場合はスキップ
   if (

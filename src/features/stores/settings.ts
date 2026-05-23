@@ -266,6 +266,8 @@ interface General {
   // Phase 4: 共演配信モード
   coStreamingMode: boolean
   coStreamerName: string
+  // Phase 6.8: 背景演出
+  backgroundChangeEnabled: boolean
 }
 
 interface ModelType {
@@ -641,6 +643,7 @@ const getInitialValuesFromEnv = (): SettingsState => ({
   coStreamingMode:
     process.env.NEXT_PUBLIC_CO_STREAMING_MODE === 'true' || false,
   coStreamerName: process.env.NEXT_PUBLIC_CO_STREAMER_NAME || '',
+  backgroundChangeEnabled: false,
 
   // Settings
   modelType:
@@ -1082,6 +1085,7 @@ const settingsStore = create<SettingsState>()(
         screenCommentaryPrompt: state.screenCommentaryPrompt,
         coStreamingMode: state.coStreamingMode,
         coStreamerName: state.coStreamerName,
+        backgroundChangeEnabled: state.backgroundChangeEnabled,
         memoryEnabled: state.memoryEnabled,
         memorySimilarityThreshold: state.memorySimilarityThreshold,
         memorySearchLimit: state.memorySearchLimit,

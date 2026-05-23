@@ -68,6 +68,10 @@ flowchart LR
 | [risks.md](risks.md) | リスクと対策 |
 | [out-of-scope.md](out-of-scope.md) | 当面やらないこと |
 | [reference/idle-mode.md](reference/idle-mode.md) | アイドルモードの説明 |
+| [co-streaming-preset.md](co-streaming-preset.md) | 共演プリセット A/B/C の詳細・タグ構文リファレンス |
+| [obs-streaming-guide.md](obs-streaming-guide.md) | OBS シーン構成・音声ルーティング・ブラウザソース設定 |
+| [onecomme-guide.md](onecomme-guide.md) | わんコメ連携設定・共演モード挙動・トラブルシューティング |
+| [e2e-youtube-checklist.md](e2e-youtube-checklist.md) | YouTube 共演配信 E2E チェックリスト |
 | [phases/](phases/) | Phase 0〜6 のタスク・完了条件 |
 
 ---

@@ -79,4 +79,15 @@ export async function fireStunt(
   if (def.shake) {
     triggerScreenShake(def.shake.intensity, def.shake.duration, def.shake.count)
   }
+
+  // Phase 6-11: ポーズを cooldownMs の 70% 後に idle へ戻す
+  if (def.motionId) {
+    const resetDelay = Math.max(def.cooldownMs * 0.7, 800)
+    setTimeout(() => {
+      const viewer = homeStore.getState().viewer
+      if (viewer?.model?.poseManager.isActive) {
+        viewer.model.poseManager.resetToIdle(viewer.model)
+      }
+    }, resetDelay)
+  }
 }

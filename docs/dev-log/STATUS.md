@@ -23,6 +23,11 @@
 
 | ID | 内容 | 完了日 |
 |----|------|--------|
+| 5-1 | `coStreamingPresets.tsx` — 3プリセットボタン（A/B/C）でシステムプロンプト即時反映 | 2026-05-23 |
+| 6.8-4 | `emotionBg.ts` — 感情タグ→背景切替（catalog.json キャッシュ付き）+ `coStreamingSettings.tsx` に UI | 2026-05-23 |
+| 6-11 | `stuntScheduler.ts` — stunt 発火後に cooldownMs×0.7 ms で `resetToIdle()` 自動実行 | 2026-05-23 |
+| 4.5-6 | `reactionScheduler.ts` — `playLaughSE` で happy 表情を SE より 100ms 先行させる | 2026-05-23 |
+| i18n | `locales/ja/translation.json` — CoStreamingPresets・BackgroundChange の 7 キー追加 | 2026-05-23 |
 | 4-4 | 状況モデル配線: Deepgram→`humanSpeaking`、画面実況→`screenChangeScore`、`shouldProactivelySpeak`→`canSpeak` | 2026-05-23 |
 | 4-5 | `coStreamingMode` / `coStreamerName` を settingsStore に追加 + 設定画面 UI | 2026-05-23 |
 | 6-5 | stunt 用 VRM ポーズ JSON 11本生成（`scripts/generate-stunt-poses.mjs`）+ poseConfigs に追加 | 2026-05-23 |
@@ -67,8 +72,8 @@
 1. **SE 差し替え** `public/assets/reactions/` の無音プレースホルダーを実音源に差し替え
 2. **stunt ポーズ調整** `[stunt:lean_in]` 等を実機で確認し、値を微調整（VRM エディタ推奨）
 3. **実機 E2E** `docs/project/e2e-youtube-checklist.md` のチェックリストを全項目確認
-4. **Phase 5** OBS 連携ガイド整備
-5. **Phase 4.5 残り** TTS パイプライン並列化（文N生成と文N-1再生のオーバーラップ）
+4. **Phase 5-3/4** OBS 構成ガイド + わんコメ運用ドキュメント整備
+5. **Phase 4.5-4** TTS パイプライン並列化（文N生成と文N-1再生のオーバーラップ）
 
 ---
 
@@ -88,7 +93,8 @@
 | M4 | ✅ Phase 4 / 4.5 実装済み |
 | M6 | ✅ Phase 6 / 6.8 実装済み |
 | M3-2 | ✅ Phase 3-2 JSONL エクスポート完了 |
-| M5 | 未達（Phase 5 OBS ガイド） |
+| M5-1 | ✅ Phase 5-1 共演プリセット UI 完了 |
+| M5 | 未達（Phase 5-3/4 OBS・わんコメ ガイド） |
 | M7 | 未達 |
 
 ---

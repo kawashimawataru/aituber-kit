@@ -249,6 +249,7 @@ interface General {
   showPresetQuestions: boolean
   speechRecognitionMode: SpeechRecognitionMode
   whisperTranscriptionModel: WhisperTranscriptionModel
+  deepgramApiKey: string
   initialSpeechTimeout: number
   chatLogWidth: number
   imageDisplayPosition: 'input' | 'side' | 'icon'
@@ -257,6 +258,11 @@ interface General {
   enableMultiModal: boolean
   colorTheme: 'default' | 'cool' | 'mono' | 'ocean' | 'forest' | 'sunset'
   customModel: boolean
+  // Phase 2: 画面実況
+  screenCommentaryEnabled: boolean
+  screenCommentaryInterval: number
+  screenCommentaryThreshold: number
+  screenCommentaryPrompt: string
 }
 
 interface ModelType {
@@ -590,6 +596,7 @@ const getInitialValuesFromEnv = (): SettingsState => ({
     (process.env
       .NEXT_PUBLIC_WHISPER_TRANSCRIPTION_MODEL as WhisperTranscriptionModel) ||
     'whisper-1',
+  deepgramApiKey: process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY || '',
   initialSpeechTimeout:
     parseFloat(process.env.NEXT_PUBLIC_INITIAL_SPEECH_TIMEOUT || '5.0') || 5.0,
   chatLogWidth:
@@ -622,6 +629,12 @@ const getInitialValuesFromEnv = (): SettingsState => ({
 
   // Custom model toggle
   customModel: process.env.NEXT_PUBLIC_CUSTOM_MODEL === 'true',
+
+  // Phase 2: 画面実況
+  screenCommentaryEnabled: false,
+  screenCommentaryInterval: 30,
+  screenCommentaryThreshold: 0.05,
+  screenCommentaryPrompt: '',
 
   // Settings
   modelType:
@@ -1029,6 +1042,7 @@ const settingsStore = create<SettingsState>()(
         showPresetQuestions: state.showPresetQuestions,
         speechRecognitionMode: state.speechRecognitionMode,
         whisperTranscriptionModel: state.whisperTranscriptionModel,
+        deepgramApiKey: state.deepgramApiKey,
         customApiUrl: state.customApiUrl,
         customApiHeaders: state.customApiHeaders,
         customApiBody: state.customApiBody,
@@ -1044,6 +1058,10 @@ const settingsStore = create<SettingsState>()(
         enableMultiModal: state.enableMultiModal,
         colorTheme: state.colorTheme,
         customModel: state.customModel,
+        screenCommentaryEnabled: state.screenCommentaryEnabled,
+        screenCommentaryInterval: state.screenCommentaryInterval,
+        screenCommentaryThreshold: state.screenCommentaryThreshold,
+        screenCommentaryPrompt: state.screenCommentaryPrompt,
         memoryEnabled: state.memoryEnabled,
         memorySimilarityThreshold: state.memorySimilarityThreshold,
         memorySearchLimit: state.memorySearchLimit,

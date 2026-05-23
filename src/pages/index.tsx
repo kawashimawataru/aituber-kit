@@ -15,6 +15,7 @@ import CharacterPresetMenu from '@/components/characterPresetMenu'
 import ImageOverlay from '@/components/ImageOverlay'
 import PresenceManager from '@/components/presenceManager'
 import IdleManager from '@/components/idleManager'
+import ScreenCommentaryManager from '@/components/screenCommentaryManager'
 import { KioskOverlay } from '@/features/kiosk/kioskOverlay'
 import homeStore from '@/features/stores/home'
 import settingsStore from '@/features/stores/settings'
@@ -99,24 +100,26 @@ const Home = () => {
     }
   }, [characterPresets, t])
 
-  const backgroundStyle =
+  const backgroundStyle: React.CSSProperties =
     (webcamStatus || captureStatus) && useVideoAsBackground
-      ? {}
+      ? { transition: 'background 0.8s ease' }
       : backgroundImageUrl === 'green'
-        ? { backgroundColor: '#00FF00' }
-        : { backgroundImage: bgUrl }
+        ? { backgroundColor: '#00FF00', transition: 'background 0.8s ease' }
+        : { backgroundImage: bgUrl, transition: 'background 0.8s ease' }
 
   return (
     <div className="h-[100svh] bg-cover" style={backgroundStyle}>
       <Meta />
       <Introduction />
-      {modelType === 'live2d' && isLive2DEnabled ? (
-        <Live2DViewer />
-      ) : modelType === 'pngtuber' ? (
-        <PNGTuberViewer />
-      ) : (
-        <VrmViewer />
-      )}
+      <div id="viewer-container">
+        {modelType === 'live2d' && isLive2DEnabled ? (
+          <Live2DViewer />
+        ) : modelType === 'pngtuber' ? (
+          <PNGTuberViewer />
+        ) : (
+          <VrmViewer />
+        )}
+      </div>
       <Form />
       <Menu />
       <ModalImage />
@@ -128,6 +131,7 @@ const Home = () => {
       <CharacterPresetMenu />
       <ImageOverlay />
       <PresenceManager />
+      <ScreenCommentaryManager />
       <div className="absolute top-4 left-4 z-30">
         <IdleManager />
       </div>

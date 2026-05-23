@@ -90,6 +90,19 @@ export const exclusionRules: ExclusionRule[] = [
     }),
   },
 
+  // Rule 3.5: speechRecognitionMode = deepgram
+  {
+    id: 'deepgram-mode',
+    description:
+      'Deepgram STT選択時にrealtimeAPIMode・audioModeをOFFにする',
+    trigger: (_incoming, merged) =>
+      merged.speechRecognitionMode === 'deepgram',
+    apply: () => ({
+      realtimeAPIMode: false,
+      audioMode: false,
+    }),
+  },
+
   // Rule 4: realtimeAPIMode OFF (前値がON)
   // audioModeがONの場合はRule 3がモデルを設定するため、ここでは復元しない
   {

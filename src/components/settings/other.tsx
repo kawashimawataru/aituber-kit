@@ -2,8 +2,10 @@ import { useTranslation } from 'react-i18next'
 import Image from 'next/image'
 
 import AdvancedSettings from './advancedSettings'
+import ChatLogExport from './chatLogExport'
 import MessageReceiverSetting from './messageReceiver'
 import PresetQuestions from './presetQuestions'
+import ScreenCommentarySettings from './screenCommentarySettings'
 
 const Other = () => {
   const { t } = useTranslation()
@@ -22,6 +24,8 @@ const Other = () => {
       </div>
 
       <AdvancedSettings />
+      <ScreenCommentarySettings />
+      <ChatLogExport />
       <PresetQuestions />
       <MessageReceiverSetting />
     </>

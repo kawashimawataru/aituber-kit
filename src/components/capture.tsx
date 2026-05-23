@@ -99,6 +99,7 @@ const Capture = () => {
       onToggleSource={startCapture}
       toggleSourceIcon="24/Reload"
       showToggleButton={true}
+      videoDataAttributes={{ 'data-screen-capture': 'true' }}
     />
   )
 }

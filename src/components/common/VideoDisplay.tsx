@@ -20,6 +20,7 @@ interface VideoDisplayProps {
   toggleSourceDisabled?: boolean
   showToggleButton?: boolean
   className?: string
+  videoDataAttributes?: Record<string, string>
 }
 
 export const VideoDisplay = forwardRef<HTMLDivElement, VideoDisplayProps>(
@@ -33,6 +34,7 @@ export const VideoDisplay = forwardRef<HTMLDivElement, VideoDisplayProps>(
       toggleSourceDisabled = false,
       showToggleButton = true,
       className = '',
+      videoDataAttributes,
     },
     ref
   ) => {
@@ -227,6 +229,7 @@ export const VideoDisplay = forwardRef<HTMLDivElement, VideoDisplayProps>(
               className={`w-full h-full object-top ${
                 useVideoAsBackground ? 'invisible' : ''
               }`}
+              {...videoDataAttributes}
             />
             {/* Resize handles */}
             {!isExpanded &&

@@ -17,6 +17,14 @@ import {
   searchMemoryContext,
 } from '@/features/memory/memoryStoreSync'
 import { THINKING_MARKER } from '@/features/chat/vercelAIChat'
+import {
+  parseLaughTag,
+  playLaughSE,
+  scheduleL1Reaction,
+} from '@/features/conversation/reactionScheduler'
+import { fireStunt } from '@/features/staging/stuntScheduler'
+import type { StuntId } from '@/features/staging/stuntTypes'
+import { recordComment } from '@/features/chat/situationModel'
 
 // セッションIDを生成する関数
 const generateSessionId = () => generateMessageId()
@@ -165,6 +173,45 @@ const extractMotionTag = (
 }
 
 /**
+ * テキストから [stunt:xxx] タグを抽出する
+ */
+const extractStuntTag = (
+  text: string
+): { stuntId: string; remainingText: string } => {
+  const match = text.match(/^\s*\[stunt:([a-z_]+)\]/i)
+  if (match) {
+    return {
+      stuntId: match[1],
+      remainingText: text
+        .slice(text.indexOf(match[0]) + match[0].length)
+        .trimStart(),
+    }
+  }
+  return { stuntId: '', remainingText: text }
+}
+
+/**
+ * テキストから [bg:xxx] タグを抽出して背景を変更する
+ * ファイル名 or キーワード: `[bg:bg-c.png]`, `[bg:night]`
+ */
+const extractAndApplyBgTag = (text: string): string => {
+  const match = text.match(/\[bg:([^\]]+)\]/gi)
+  if (!match) return text
+
+  let remaining = text
+  for (const tag of match) {
+    const bgName = tag.match(/\[bg:([^\]]+)\]/i)?.[1] ?? ''
+    if (bgName) {
+      // backgrounds/ 配下に対応ファイルがあればパスをセット、なければキーワードのまま
+      const bgPath = bgName.includes('.') ? `/backgrounds/${bgName}` : bgName
+      homeStore.setState({ backgroundImageUrl: bgPath })
+    }
+    remaining = remaining.replace(tag, '').trimStart()
+  }
+  return remaining
+}
+
+/**
  * テキストから文法的に区切りの良い文を抽出する
  * @param text 入力テキスト
  * @returns 抽出された文と残りのテキスト
@@ -307,8 +354,15 @@ export const speakMessageHandler = async (receivedMessage: string) => {
           extractEmotion(localRemaining)
         const { motionTag, remainingText: textAfterMotion } =
           extractMotionTag(textAfterEmotion)
+        const { stuntId, remainingText: textAfterStunt } =
+          extractStuntTag(textAfterMotion)
+        if (stuntId) void fireStunt(stuntId as StuntId)
+        const { laughType, remainingText: textAfterLaugh } =
+          parseLaughTag(textAfterStunt)
+        if (laughType) void playLaughSE(laughType)
+        const textAfterBg = extractAndApplyBgTag(textAfterLaugh)
         const { sentence, remainingText: textAfterSentence } =
-          extractSentence(textAfterMotion)
+          extractSentence(textAfterBg)
 
         if (sentence) {
           assistantMessageListRef.current.push(sentence)
@@ -325,7 +379,7 @@ export const speakMessageHandler = async (receivedMessage: string) => {
           localRemaining = textAfterSentence
         } else {
           if (localRemaining === prevLocalRemaining && localRemaining) {
-            const finalSentence = textAfterMotion || localRemaining
+            const finalSentence = textAfterBg || localRemaining
             assistantMessageListRef.current.push(finalSentence)
             const aiText = emotionTag
               ? `${emotionTag} ${finalSentence}`
@@ -599,8 +653,15 @@ export const processAIResponse = async (messages: Message[]) => {
                 remainingText: textAfterMotion,
               } = extractMotionTag(textAfterEmotion)
               if (extractedMotion) currentMotionTag = extractedMotion
+              const { stuntId: bsStuntId, remainingText: bsAfterStunt } =
+                extractStuntTag(textAfterMotion)
+              if (bsStuntId) void fireStunt(bsStuntId as StuntId)
+              const { laughType: bsLaughType, remainingText: bsAfterLaugh } =
+                parseLaughTag(bsAfterStunt)
+              if (bsLaughType) void playLaughSE(bsLaughType)
+              const bsAfterBg = extractAndApplyBgTag(bsAfterLaugh)
               const { sentence, remainingText: textAfterSentence } =
-                extractSentence(textAfterMotion)
+                extractSentence(bsAfterBg)
 
               if (sentence) {
                 hasSpeakBeenCalled =
@@ -658,9 +719,16 @@ export const processAIResponse = async (messages: Message[]) => {
               remainingText: textAfterMotion,
             } = extractMotionTag(textAfterEmotion)
             if (extractedMotion) currentMotionTag = extractedMotion
+            const { stuntId: msStuntId, remainingText: msAfterStunt } =
+              extractStuntTag(textAfterMotion)
+            if (msStuntId) void fireStunt(msStuntId as StuntId)
+            const { laughType: msLaughType, remainingText: msAfterLaugh } =
+              parseLaughTag(msAfterStunt)
+            if (msLaughType) void playLaughSE(msLaughType)
+            const msAfterBg = extractAndApplyBgTag(msAfterLaugh)
 
             const { sentence, remainingText: textAfterSentence } =
-              extractSentence(textAfterMotion)
+              extractSentence(msAfterBg)
 
             if (sentence) {
               hasSpeakBeenCalled =
@@ -713,11 +781,18 @@ export const processAIResponse = async (messages: Message[]) => {
               remainingText: finalTextAfterMotion,
             } = extractMotionTag(finalText)
             if (extractedMotion) currentMotionTag = extractedMotion
+            const { stuntId: doneStuntId, remainingText: doneAfterStunt } =
+              extractStuntTag(finalTextAfterMotion)
+            if (doneStuntId) void fireStunt(doneStuntId as StuntId)
+            const { laughType: doneLaughType, remainingText: doneAfterLaugh } =
+              parseLaughTag(doneAfterStunt)
+            if (doneLaughType) void playLaughSE(doneLaughType)
+            const doneAfterBg = extractAndApplyBgTag(doneAfterLaugh)
 
             hasSpeakBeenCalled =
               handleSpeakAndStateUpdate(
                 sessionId,
-                finalTextAfterMotion,
+                doneAfterBg,
                 currentEmotionTag,
                 assistantMessageListRef,
                 currentSlideMessagesRef,
@@ -1020,6 +1095,10 @@ export const handleSendChatFn =
           ss.includeTimestampInUserMessage
         ),
       ]
+
+      // L1 先出し反応（コメント受信時）& 状況モデル更新
+      scheduleL1Reaction(newMessage)
+      recordComment()
 
       try {
         await processAIResponse(messages)

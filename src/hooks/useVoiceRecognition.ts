@@ -6,6 +6,7 @@ import { SpeakQueue } from '@/features/messages/speakQueue'
 import { useBrowserSpeechRecognition } from './useBrowserSpeechRecognition'
 import { useWhisperRecognition } from './useWhisperRecognition'
 import { useRealtimeVoiceAPI } from './useRealtimeVoiceAPI'
+import { useDeepgramRecognition } from './useDeepgramRecognition'
 
 type UseVoiceRecognitionProps = {
   onChatProcessStart: (text: string) => void
@@ -35,13 +36,18 @@ export function useVoiceRecognition({
   // リアルタイムAPI処理フック
   const realtimeAPI = useRealtimeVoiceAPI(onChatProcessStart)
 
+  // Deepgram Live Streaming フック
+  const deepgramSpeech = useDeepgramRecognition(onChatProcessStart)
+
   // ----- 現在のモードに基づいて適切なフックを選択 -----
   const currentHook =
-    speechRecognitionMode === 'browser'
-      ? realtimeAPIMode
-        ? realtimeAPI
-        : browserSpeech
-      : whisperSpeech
+    speechRecognitionMode === 'deepgram'
+      ? deepgramSpeech
+      : speechRecognitionMode === 'browser'
+        ? realtimeAPIMode
+          ? realtimeAPI
+          : browserSpeech
+        : whisperSpeech
 
   // ----- currentHookの関数参照をrefで保持（依存配列からcurrentHookを除去するため） -----
   const currentHookRef = useRef({
@@ -79,9 +85,10 @@ export function useVoiceRecognition({
 
     // 常時マイク入力モードの場合、ストップ後にマイクを再開
     // （stopAllではコールバックが呼ばれないため、ここで再開処理を行う）
+    const mode = settingsStore.getState().speechRecognitionMode
     if (
       settingsStore.getState().continuousMicListeningMode &&
-      settingsStore.getState().speechRecognitionMode === 'browser' &&
+      (mode === 'browser' || mode === 'deepgram') &&
       !homeStore.getState().chatProcessing
     ) {
       console.log('🔄 ストップボタンが押されました。音声認識を再開します。')
@@ -96,7 +103,8 @@ export function useVoiceRecognition({
     // 常時マイク入力モードがONで、現在マイク入力が行われていない場合のみ実行
     if (
       continuousMicListeningMode &&
-      speechRecognitionMode === 'browser' &&
+      (speechRecognitionMode === 'browser' ||
+        speechRecognitionMode === 'deepgram') &&
       !homeStore.getState().chatProcessing
     ) {
       console.log('🔄 AIの発話が完了しました。音声認識を自動的に再開します。')
@@ -111,7 +119,8 @@ export function useVoiceRecognition({
     if (
       continuousMicListeningMode &&
       !currentHookRef.current.isListening &&
-      speechRecognitionMode === 'browser' &&
+      (speechRecognitionMode === 'browser' ||
+        speechRecognitionMode === 'deepgram') &&
       !homeStore.getState().isSpeaking &&
       !homeStore.getState().chatProcessing
     ) {
@@ -126,8 +135,12 @@ export function useVoiceRecognition({
   // ----- 常時マイク入力モードの定期チェック -----
   // マイクがOFFになっていたら自動でONに戻す
   useEffect(() => {
-    // 常時マイク入力モードがOFF、またはブラウザモード以外の場合は何もしない
-    if (!continuousMicListeningMode || speechRecognitionMode !== 'browser') {
+    // 常時マイク入力モードがOFF、またはブラウザ/Deepgramモード以外の場合は何もしない
+    if (
+      !continuousMicListeningMode ||
+      (speechRecognitionMode !== 'browser' &&
+        speechRecognitionMode !== 'deepgram')
+    ) {
       return
     }
 
@@ -176,8 +189,11 @@ export function useVoiceRecognition({
 
   // 発話完了時のコールバックを登録
   useEffect(() => {
-    // ブラウザモードでのみコールバックを登録
-    if (speechRecognitionMode === 'browser') {
+    // ブラウザ/Deepgramモードでコールバックを登録
+    if (
+      speechRecognitionMode === 'browser' ||
+      speechRecognitionMode === 'deepgram'
+    ) {
       SpeakQueue.onSpeakCompletion(handleSpeakCompletion)
 
       return () => {
@@ -190,9 +206,10 @@ export function useVoiceRecognition({
   // コンポーネントのマウント時に常時マイク入力モードがONの場合は自動的にマイク入力を開始
   useEffect(() => {
     // マウント時の処理（settingsStore.getState()でstale closure回避）
+    const mountMode = settingsStore.getState().speechRecognitionMode
     if (
       settingsStore.getState().continuousMicListeningMode &&
-      settingsStore.getState().speechRecognitionMode === 'browser' &&
+      (mountMode === 'browser' || mountMode === 'deepgram') &&
       !currentHookRef.current.isListening &&
       !homeStore.getState().isSpeaking &&
       !homeStore.getState().chatProcessing

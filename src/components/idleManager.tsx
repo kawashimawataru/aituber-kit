@@ -5,11 +5,18 @@
  * Requirements: 4.1, 5.3, 6.1
  */
 
+import { useEffect } from 'react'
 import { useIdleMode } from '@/hooks/useIdleMode'
 import { useTranslation } from 'react-i18next'
+import { startSituationTracker } from '@/features/chat/situationModel'
 
 function IdleManager(): JSX.Element | null {
   const { t } = useTranslation()
+
+  useEffect(() => {
+    const stop = startSituationTracker()
+    return stop
+  }, [])
 
   const { isIdleActive, idleState, secondsUntilNextSpeech } = useIdleMode({
     onIdleSpeechStart: (phrase) => {

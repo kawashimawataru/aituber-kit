@@ -7,6 +7,8 @@ import { WhisperTranscriptionModel } from '@/features/constants/settings'
 import { Link } from '../link'
 import { getOpenAIWhisperModels } from '@/features/constants/aiModels'
 
+const SPEECH_MODES = ['browser', 'whisper', 'deepgram'] as const
+
 const SpeechInput = () => {
   const noSpeechTimeout = settingsStore((s) => s.noSpeechTimeout)
   const showSilenceProgressBar = settingsStore((s) => s.showSilenceProgressBar)
@@ -15,6 +17,7 @@ const SpeechInput = () => {
     (s) => s.whisperTranscriptionModel
   )
   const openaiKey = settingsStore((s) => s.openaiKey)
+  const deepgramApiKey = settingsStore((s) => s.deepgramApiKey)
   const continuousMicListeningMode = settingsStore(
     (s) => s.continuousMicListeningMode
   )
@@ -57,20 +60,27 @@ const SpeechInput = () => {
             {t('SpeechRecognitionModeDisabledInfo')}
           </div>
         )}
-        <div className="mt-2">
-          <TextButton
-            onClick={() =>
-              settingsStore.setState({
-                speechRecognitionMode:
-                  speechRecognitionMode === 'browser' ? 'whisper' : 'browser',
-              })
-            }
-            disabled={isSpeechModeSwitchDisabled}
-          >
-            {speechRecognitionMode === 'browser'
-              ? t('BrowserSpeechRecognition')
-              : t('WhisperSpeechRecognition')}
-          </TextButton>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {SPEECH_MODES.map((mode) => (
+            <TextButton
+              key={mode}
+              onClick={() =>
+                settingsStore.setState({ speechRecognitionMode: mode })
+              }
+              disabled={isSpeechModeSwitchDisabled}
+              className={
+                speechRecognitionMode === mode
+                  ? 'opacity-100'
+                  : 'opacity-50'
+              }
+            >
+              {mode === 'browser'
+                ? t('BrowserSpeechRecognition')
+                : mode === 'whisper'
+                  ? t('WhisperSpeechRecognition')
+                  : t('DeepgramSpeechRecognition')}
+            </TextButton>
+          ))}
         </div>
       </div>
       {speechRecognitionMode === 'whisper' && (
@@ -121,6 +131,47 @@ const SpeechInput = () => {
                 </option>
               ))}
             </select>
+          </div>
+        </>
+      )}
+      {speechRecognitionMode === 'deepgram' && (
+        <>
+          <div className="my-6">
+            <div className="my-4 text-xl font-bold">
+              {t('DeepgramApiKeyLabel')}
+            </div>
+            <div className="my-4">
+              {t('DeepgramApiKeyInfo')}
+              <br />
+              <Link
+                url="https://console.deepgram.com/"
+                label="Deepgram Console"
+              />
+            </div>
+            <input
+              className="text-ellipsis px-4 py-2 w-full md:w-1/2 bg-white hover:bg-white-hover rounded-lg"
+              type="text"
+              placeholder="..."
+              value={deepgramApiKey}
+              onChange={(e) =>
+                settingsStore.setState({ deepgramApiKey: e.target.value })
+              }
+            />
+            <div className="my-4 text-sm text-gray-500 whitespace-pre-wrap">
+              {t('DeepgramKeyNotRequired')}
+            </div>
+          </div>
+          <div className="my-6">
+            <div className="my-4 text-xl font-bold">{t('ContinuousMic')}</div>
+            <div className="my-2 text-sm whitespace-pre-wrap">
+              {t('DeepgramContinuousMicInfo')}
+            </div>
+            <ToggleSwitch
+              enabled={continuousMicListeningMode}
+              onChange={(v) =>
+                settingsStore.setState({ continuousMicListeningMode: v })
+              }
+            />
           </div>
         </>
       )}

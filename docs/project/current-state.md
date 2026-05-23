@@ -6,14 +6,16 @@
 |------|----------|--------------|
 | 配信コメント | YouTube API / **わんコメ**（Twitch 等を集約可） | 視聴者入力 |
 | 会話継続 | Mastra ワークフロー（継続・新トピック・スリープ） | コメントが少ないときの自発話 **の前身** |
-| STT | ブラウザ Web Speech / Whisper / Realtime API | 常時 ON は未対応、要 Deepgram 等 |
+| STT | ブラウザ Web Speech / Whisper / Realtime API / **Deepgram（実装済）** | Deepgram: `/hooks/useDeepgramRecognition.ts`、WS Streaming + endpointing |
 | 記憶 | `maxPastMessages` + RAG（IndexedDB + Embedding） | セッション跨ぎ・視聴者 ID は弱い |
 | 感情・モーション | `[happy]` `[motion:xxx]`、Live2D/VRM マッピング | 拡張の土台 |
-| 視覚 | マルチモーダル（カメラ・画像アップロード） | **画面キャプチャ実況は未実装** |
-| 能動性 | **アイドルモード**、**人感検知**（キオスク向け） | 配信向け状況モデルは未整備 |
+| 視覚 | マルチモーダル（カメラ・画像アップロード）/ **画面実況（実装済）** | `features/vision/`, `useScreenCommentary.ts`, `/api/vision-commentary.ts` |
+| 能動性 | **アイドルモード**、**人感検知**、**状況モデル（実装済）** | `SessionSituation`, `startSituationTracker`, `shouldProactivelySpeak` |
 | 外部連携 | WebSocket 外部連携モード | Python サイドカー連携の候補 |
-| 会話リアリティ | LLM ストリーム → 文節 TTS → `SpeakQueue` 直列再生 | **笑い専用音・先出し反応・低遅延パイプラインは未整備**（[Phase 4.5](phases/phase-04-5-conversation-reality.md)） |
-| 身体性演出 | VRM `[motion:]`・Live2D モーション・画像オーバーレイ | **台パン SE・画面シェイク・複合演出キューは未整備**（Phase 6） |
+| 会話リアリティ | L1先出し反応・笑い SE・`[laugh:*]` タグ **（実装済）** | `reactionScheduler.ts`, handlers.ts パイプライン統合 |
+| 身体性演出 | `[stunt:xxx]` タグ・画面シェイク・SE 同時発火 **（実装済）** | `stuntScheduler.ts`, `screenShake.ts`, `stuntTypes.ts`（11 stunt） |
+| 背景演出 | `[bg:xxx]` タグで LLM 起点の背景切替 **（実装済）** | `extractAndApplyBgTag`, 0.8s CSS transition |
+| ログ | JSONL エクスポート **（実装済）** | `exportChatLog.ts`, 設定→その他→ダウンロードボタン |
 
 ### pngtuber-main から持ってこれる知見（コード参照用）
 
@@ -33,7 +35,7 @@
 
 | 項目 | 有無 | 実装の実態 |
 |------|------|------------|
-| **会話中に「体を傾ける」タグ** | × | `[lean]` / `[stunt:lean_*]` 等のパース・専用 API なし |
+| **会話中に「体を傾ける」タグ** | ✅ | `[stunt:lean_in]` `[stunt:lean_forward]` `[stunt:lean_back]` `[stunt:tilt_head]` — stuntScheduler でパース・実行 |
 | **VRM 全身の傾き** | △ | `[motion:xxx]` → `poseConfigs` → `PoseManager.applyPose`（JSON/VRMA ポーズ）で **作者が傾きポーズを作れば可能**だが、標準同梱・自動傾きではない |
 | **VRM 表情のみ** | ○ | `EmoteController` / `ExpressionController`（happy, sad 等） |
 | **`characterRotation` 設定** | △ | 名前は rotation だが実体は **カメラの注視点（target）**（`viewer.ts` の `saveCameraPosition`）。**骨格の体傾きではない** |
@@ -60,7 +62,7 @@
 | **環境変数初期値** | ○ | `NEXT_PUBLIC_BACKGROUND_IMAGE_PATH`（`.env.example`） |
 | **Webカメラ/画面共有を背景に** | ○ | `useVideoAsBackground`（設定 → **その他** `advancedSettings.tsx`、表示は `VideoDisplay.tsx`） |
 | **メニューから画像1枚** | ○ | `menu.tsx` の hidden file input → `homeStore.backgroundImageUrl`（Blob URL、永続化はしない） |
-| **会話・感情から背景を変える** | × | LLM タグ `[bg:night]` 等、状況連動フェードなし |
+| **会話・感情から背景を変える** | ✅ | `[bg:xxx]` タグ → `extractAndApplyBgTag` → `homeStore.backgroundImageUrl`、0.8s CSS transition |
 | **動画背景ループ（ファイル）** | × | 共有画面以外の MP4 背景カタログなし |
 
 **結論**: **配信前・手動での背景変更は十分**。Neuro 的な「ムードで背景が変わる」は **未実装 → Phase 6.8（下記）** で計画。

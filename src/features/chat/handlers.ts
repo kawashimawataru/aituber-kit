@@ -240,6 +240,9 @@ const extractSentence = (
  * @param currentSlideMessagesRef スライドメッセージリストの参照
  * @param motionTag モーションタグ (例: "think")
  */
+let _ttfrMeasured = false
+let _ttfaMeasured = false
+
 const handleSpeakAndStateUpdate = (
   sessionId: string,
   sentence: string,
@@ -264,6 +267,22 @@ const handleSpeakAndStateUpdate = (
     return false
   }
 
+  // TTFR: 最初の TTS キュー投入までの時間
+  if (!_ttfrMeasured && typeof performance !== 'undefined') {
+    try {
+      performance.mark('first-audio-queued')
+      const ttfr = performance.measure(
+        'TTFR',
+        'input-confirmed',
+        'first-audio-queued'
+      )
+      console.info(`[TTFR] ${Math.round(ttfr.duration)} ms`)
+    } catch {
+      // input-confirmed マークが存在しない場合は無視
+    }
+    _ttfrMeasured = true
+  }
+
   speakCharacter(
     sessionId,
     { message: sentence, emotion: emotion, motion: motionTag || undefined },
@@ -273,6 +292,21 @@ const handleSpeakAndStateUpdate = (
       homeStore.setState({
         slideMessages: [...currentSlideMessagesRef.current],
       })
+      // TTFA: 最初の発話開始（speakCharacter onStart）までの時間
+      if (!_ttfaMeasured && typeof performance !== 'undefined') {
+        try {
+          performance.mark('first-audio-play')
+          const ttfa = performance.measure(
+            'TTFA',
+            'input-confirmed',
+            'first-audio-play'
+          )
+          console.info(`[TTFA] ${Math.round(ttfa.duration)} ms`)
+        } catch {
+          // input-confirmed マークが存在しない場合は無視
+        }
+        _ttfaMeasured = true
+      }
     },
     () => {
       hs.decrementChatProcessingCount()
@@ -1095,6 +1129,17 @@ export const handleSendChatFn =
           ss.includeTimestampInUserMessage
         ),
       ]
+
+      // TTFR/TTFA 計測: 入力確定点
+      _ttfrMeasured = false
+      _ttfaMeasured = false
+      if (typeof performance !== 'undefined') {
+        try {
+          performance.mark('input-confirmed')
+        } catch {
+          // 無視
+        }
+      }
 
       // L1 先出し反応（コメント受信時）& 状況モデル更新
       scheduleL1Reaction(newMessage)

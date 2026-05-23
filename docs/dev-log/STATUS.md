@@ -23,6 +23,11 @@
 
 | ID | 内容 | 完了日 |
 |----|------|--------|
+| P0-1 | `scripts/generate-placeholder-se.mjs` + 9ファイル WAV 生成（public/assets/reactions/） | 2026-05-23 |
+| P0-3 | `co-streaming-preset.md` プリセット B にタグ構文リファレンス追記 | 2026-05-23 |
+| P1 | TTFR/TTFA `performance.mark` 計測を handlers.ts に追加（console.info 出力） | 2026-05-23 |
+| P1 | E2E チェックリスト拡張（Deepgram / 画面実況 / 演出タグ / JSONL） | 2026-05-23 |
+| P2 | `current-state.md` を実装済み内容（STT/視覚/stunt/laugh/bg/ログ）に更新 | 2026-05-23 |
 | 4-1 | `situationModel.ts` — SessionSituation 追跡・能動発話ポリシー | 2026-05-23 |
 | 4-2 | `IdleManager` に `startSituationTracker()` を組み込み（mount/unmount cleanup） | 2026-05-23 |
 | 4-3 | `handlers.ts` に `recordComment()` + `scheduleL1Reaction()` 連携 | 2026-05-23 |
@@ -56,10 +61,10 @@
 
 ## 次にやること（優先順）
 
-1. **実機確認** 画面共有 ON → 「その他」設定で画面実況 ON → 30秒後に実況が来るか
-2. **Phase 1 実機テスト** Deepgram STT（`DEEPGRAM_API_KEY` 設定後）
-3. **Phase 5** OBS 連携ガイド・共演ドキュメント整備
-4. **Phase 7** 長期記憶の改善（RAG クオリティ向上）
+1. **SE 差し替え** `public/assets/reactions/` の無音プレースホルダーを実音源に差し替え（`scripts/generate-placeholder-se.mjs` 参照）
+2. **実機 E2E** `docs/project/e2e-youtube-checklist.md` のチェックリストを順番に確認・記録
+3. **Phase 5** OBS 連携ガイド・共演ドキュメント整備（`docs/project/phases/phase-05-co-streaming.md`）
+4. **stunt モーション素材** poseConfigs に `stunt_lean_in` 等の VRM ポーズ JSON を追加
 
 ---
 

@@ -2,6 +2,11 @@ import { Talk } from './messages'
 import homeStore from '@/features/stores/home'
 import settingsStore from '@/features/stores/settings'
 
+function pickRandomEmotion(list: string[] | undefined): string | undefined {
+  if (!list?.length) return undefined
+  return list[Math.floor(Math.random() * list.length)]
+}
+
 export class Live2DHandler {
   private static idleMotionInterval: NodeJS.Timeout | null = null // インターバルIDを保持
 
@@ -13,83 +18,73 @@ export class Live2DHandler {
     const hs = homeStore.getState()
     const ss = settingsStore.getState()
     const live2dViewer = hs.live2dViewer
-    if (!live2dViewer) return
+    if (!live2dViewer) {
+      console.warn(
+        '[Live2D] live2dViewer が未ロードのためリップシンクなしで音声のみ再生します。Cubism Core とモデル表示を確認してください。'
+      )
+      await Live2DHandler.playAudioOnly(audioBuffer, isNeedDecode)
+      return
+    }
 
     let expression: string | undefined
     let motion: string | undefined
     switch (talk.emotion) {
       case 'neutral':
-        expression =
-          ss.neutralEmotions[
-            Math.floor(Math.random() * ss.neutralEmotions.length)
-          ]
+        expression = pickRandomEmotion(ss.neutralEmotions)
         motion = ss.neutralMotionGroup
         break
       case 'happy':
-        expression =
-          ss.happyEmotions[Math.floor(Math.random() * ss.happyEmotions.length)]
+        expression = pickRandomEmotion(ss.happyEmotions)
         motion = ss.happyMotionGroup
         break
       case 'sad':
-        expression =
-          ss.sadEmotions[Math.floor(Math.random() * ss.sadEmotions.length)]
+        expression = pickRandomEmotion(ss.sadEmotions)
         motion = ss.sadMotionGroup
         break
       case 'angry':
-        expression =
-          ss.angryEmotions[Math.floor(Math.random() * ss.angryEmotions.length)]
+        expression = pickRandomEmotion(ss.angryEmotions)
         motion = ss.angryMotionGroup
         break
       case 'relaxed':
-        expression =
-          ss.relaxedEmotions[
-            Math.floor(Math.random() * ss.relaxedEmotions.length)
-          ]
+        expression = pickRandomEmotion(ss.relaxedEmotions)
         motion = ss.relaxedMotionGroup
         break
       case 'surprised':
-        expression =
-          ss.surprisedEmotions[
-            Math.floor(Math.random() * ss.surprisedEmotions.length)
-          ]
+        expression = pickRandomEmotion(ss.surprisedEmotions)
         motion = ss.surprisedMotionGroup
     }
 
-    // AudioContextの作成
-    const audioContext = new AudioContext()
-    let decodedAudio: AudioBuffer
+    let durationSec = 10
+    let audioUrl: string
 
     if (isNeedDecode) {
-      // 圧縮音声の場合
-      decodedAudio = await audioContext.decodeAudioData(audioBuffer)
+      const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' })
+      audioUrl = URL.createObjectURL(audioBlob)
+      try {
+        const audioContext = new AudioContext()
+        const decoded = await audioContext.decodeAudioData(audioBuffer.slice(0))
+        durationSec = decoded.duration || 10
+        await audioContext.close().catch(() => undefined)
+      } catch {
+        durationSec = 10
+      }
     } else {
-      // PCM16形式の場合
+      const audioContext = new AudioContext()
       const pcmData = new Int16Array(audioBuffer)
       const floatData = new Float32Array(pcmData.length)
       for (let i = 0; i < pcmData.length; i++) {
         floatData[i] =
           pcmData[i] < 0 ? pcmData[i] / 32768.0 : pcmData[i] / 32767.0
       }
-      decodedAudio = audioContext.createBuffer(1, floatData.length, 24000) // sampleRateは必要に応じて調整
+      const decodedAudio = audioContext.createBuffer(1, floatData.length, 24000)
       decodedAudio.getChannelData(0).set(floatData)
+      durationSec = decodedAudio.duration || 10
+      const audioBlob = new Blob([this.audioBufferToWav(decodedAudio)], {
+        type: 'audio/wav',
+      })
+      audioUrl = URL.createObjectURL(audioBlob)
+      await audioContext.close().catch(() => undefined)
     }
-
-    // デコードされた音声データをBlobに変換
-    const offlineContext = new OfflineAudioContext(
-      decodedAudio.numberOfChannels,
-      decodedAudio.length,
-      decodedAudio.sampleRate
-    )
-    const source = offlineContext.createBufferSource()
-    source.buffer = decodedAudio
-    source.connect(offlineContext.destination)
-    source.start()
-
-    const renderedBuffer = await offlineContext.startRendering()
-    const audioBlob = await new Blob([this.audioBufferToWav(renderedBuffer)], {
-      type: 'audio/wav',
-    })
-    const audioUrl = URL.createObjectURL(audioBlob)
 
     // Live2Dモデルの表情を設定
     if (expression) {
@@ -126,8 +121,51 @@ export class Live2DHandler {
       })
 
       // フォールバック: 音声の理論上の再生時間 + 1 秒で強制解決
-      const fallbackTimeout = (decodedAudio.duration || 0) * 1000 + 1000
+      const fallbackTimeout = durationSec * 1000 + 1000
       setTimeout(finish, fallbackTimeout)
+    })
+  }
+
+  /** Live2D 未表示時でも TTS を聞けるフォールバック */
+  private static async playAudioOnly(
+    audioBuffer: ArrayBuffer,
+    isNeedDecode: boolean
+  ): Promise<void> {
+    const audioContext = new AudioContext()
+    try {
+      const decoded = isNeedDecode
+        ? await audioContext.decodeAudioData(audioBuffer.slice(0))
+        : audioBuffer
+
+      if (!isNeedDecode) {
+        const pcmData = new Int16Array(decoded as ArrayBuffer)
+        const floatData = new Float32Array(pcmData.length)
+        for (let i = 0; i < pcmData.length; i++) {
+          floatData[i] =
+            pcmData[i] < 0 ? pcmData[i] / 32768.0 : pcmData[i] / 32767.0
+        }
+        const buf = audioContext.createBuffer(1, floatData.length, 24000)
+        buf.getChannelData(0).set(floatData)
+        await Live2DHandler.playDecodedBuffer(audioContext, buf)
+        return
+      }
+
+      await Live2DHandler.playDecodedBuffer(audioContext, decoded as AudioBuffer)
+    } finally {
+      await audioContext.close().catch(() => undefined)
+    }
+  }
+
+  private static playDecodedBuffer(
+    audioContext: AudioContext,
+    buffer: AudioBuffer
+  ): Promise<void> {
+    return new Promise((resolve) => {
+      const source = audioContext.createBufferSource()
+      source.buffer = buffer
+      source.connect(audioContext.destination)
+      source.onended = () => resolve()
+      source.start(0)
     })
   }
 
@@ -136,6 +174,11 @@ export class Live2DHandler {
     const live2dViewer = hs.live2dViewer
     if (!live2dViewer) return
     live2dViewer.stopSpeaking()
+  }
+
+  /** Live2D ビューア破棄時のクリーンアップ */
+  static dispose() {
+    Live2DHandler.stopIdleMotion()
   }
 
   static async resetToIdle() {
@@ -152,8 +195,7 @@ export class Live2DHandler {
 
     const idleMotion = ss.idleMotionGroup || 'Idle'
     live2dViewer.motion(idleMotion)
-    const expression =
-      ss.neutralEmotions[Math.floor(Math.random() * ss.neutralEmotions.length)]
+    const expression = pickRandomEmotion(ss.neutralEmotions)
     if (expression) {
       live2dViewer.expression(expression)
     }

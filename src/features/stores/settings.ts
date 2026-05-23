@@ -177,6 +177,8 @@ interface Character {
   systemPrompt: string
   selectedVrmPath: string
   selectedLive2DPath: string
+  /** ローカル: VTube Studio 等から Live2D を取り込むフォルダパス */
+  live2dImportSourcePath: string
   fixedCharacterPosition: boolean
   characterPosition: {
     x: number
@@ -399,14 +401,15 @@ const getInitialValuesFromEnv = (): SettingsState => ({
     parseFloat(
       process.env.NEXT_PUBLIC_AIVIS_CLOUD_POST_PHONEME_LENGTH || '0.1'
     ) || 0.1,
-  stylebertvits2ServerUrl: '',
+  stylebertvits2ServerUrl:
+    process.env.NEXT_PUBLIC_STYLEBERTVITS2_SERVER_URL || '',
   stylebertvits2ModelId: process.env.NEXT_PUBLIC_STYLEBERTVITS2_MODEL_ID || '0',
   stylebertvits2ApiKey: '',
   stylebertvits2Style:
     process.env.NEXT_PUBLIC_STYLEBERTVITS2_STYLE || 'Neutral',
   stylebertvits2SdpRatio:
-    parseFloat(process.env.NEXT_PUBLIC_STYLEBERTVITS2_SDP_RATIO || '0.2') ||
-    0.2,
+    parseFloat(process.env.NEXT_PUBLIC_STYLEBERTVITS2_SDP_RATIO || '0.35') ||
+    0.35,
   stylebertvits2Length:
     parseFloat(process.env.NEXT_PUBLIC_STYLEBERTVITS2_LENGTH || '1.0') || 1.0,
   gsviTtsServerUrl:
@@ -500,6 +503,9 @@ const getInitialValuesFromEnv = (): SettingsState => ({
   selectedLive2DPath:
     process.env.NEXT_PUBLIC_SELECTED_LIVE2D_PATH ||
     '/live2d/nike01/nike01.model3.json',
+  live2dImportSourcePath:
+    process.env.NEXT_PUBLIC_LIVE2D_IMPORT_SOURCE_PATH ||
+    (process.env.LIVE2D_VTS_IMPORT_PATH ?? ''),
   fixedCharacterPosition:
     process.env.NEXT_PUBLIC_FIXED_CHARACTER_POSITION === 'true',
   characterPosition: (() => {
@@ -1020,6 +1026,7 @@ const settingsStore = create<SettingsState>()(
         azureTTSEndpoint: state.azureTTSEndpoint,
         selectedVrmPath: state.selectedVrmPath,
         selectedLive2DPath: state.selectedLive2DPath,
+        live2dImportSourcePath: state.live2dImportSourcePath,
         fixedCharacterPosition: state.fixedCharacterPosition,
         characterPosition: state.characterPosition,
         characterRotation: state.characterRotation,

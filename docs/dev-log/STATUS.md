@@ -74,6 +74,7 @@
 3. **実機 E2E** `docs/project/e2e-youtube-checklist.md` のチェックリストを全項目確認
 4. **Phase 5-3/4** OBS 構成ガイド + わんコメ運用ドキュメント整備
 5. **Phase 4.5-4** TTS パイプライン並列化（文N生成と文N-1再生のオーバーラップ）
+6. **Irodori-TTS 移行**（将来）— [irodori-tts-migration.md](../project/irodori-tts-migration.md)。ローカル本体: `/Users/kawashimawataru/Desktop/Fuva_file/Irodori-TTS`
 
 ---
 

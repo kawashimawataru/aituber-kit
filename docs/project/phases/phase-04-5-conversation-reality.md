@@ -89,7 +89,7 @@ sequenceDiagram
 |----------|----------|------|
 | VOICEVOX / Aivis / SBV2 | △ | 記号・伸ばしで近似、専用 SE の方が自然なことが多い |
 | ElevenLabs / OpenAI TTS | ○〜△ | プロソディ・タグ次第 |
-| ローカル Irodori 系（pngtuber） | ○ | 絵文字感情 — 本 Kit には未統合 |
+| ローカル Irodori 系（pngtuber） | ○ | 絵文字感情 — 本 Kit には未統合 → [irodori-tts-migration.md](../irodori-tts-migration.md) |
 
 #### 4.5.5 タスク一覧
 

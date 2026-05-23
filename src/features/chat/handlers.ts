@@ -26,6 +26,15 @@ import { fireStunt } from '@/features/staging/stuntScheduler'
 import type { StuntId } from '@/features/staging/stuntTypes'
 import { recordComment } from '@/features/chat/situationModel'
 import { applyEmotionBackground } from '@/features/staging/emotionBg'
+import {
+  getImageFromMessageContent,
+  getTextFromMessageContent,
+} from '@/utils/multimodalContent'
+import {
+  extractSentenceForVoice,
+  finalizeStyleBertVits2Tail,
+  isInvalidStandaloneTtsUnit,
+} from '@/utils/ttsSentenceSplit'
 
 // セッションIDを生成する関数
 const generateSessionId = () => generateMessageId()
@@ -214,22 +223,15 @@ const extractAndApplyBgTag = (text: string): string => {
 
 /**
  * テキストから文法的に区切りの良い文を抽出する
- * @param text 入力テキスト
- * @returns 抽出された文と残りのテキスト
+ * Style-Bert-VITS2 時は括弧をまたがない・句点単位の切り出し
  */
 const extractSentence = (
   text: string
 ): { sentence: string; remainingText: string } => {
-  const sentenceMatch = text.match(
-    /^(.{1,19}?(?:[。．.!?！？\n]|(?=\[))|.{20,}?(?:[、,。．.!?！？\n]|(?=\[)))/
+  return extractSentenceForVoice(
+    text,
+    settingsStore.getState().selectVoice
   )
-  if (sentenceMatch?.[0]) {
-    return {
-      sentence: sentenceMatch[0],
-      remainingText: text.slice(sentenceMatch[0].length).trimStart(),
-    }
-  }
-  return { sentence: '', remainingText: text }
 }
 
 /**
@@ -826,16 +828,26 @@ export const processAIResponse = async (messages: Message[]) => {
               parseLaughTag(doneAfterStunt)
             if (doneLaughType) void playLaughSE(doneLaughType)
             const doneAfterBg = extractAndApplyBgTag(doneAfterLaugh)
+            const tailText =
+              settingsStore.getState().selectVoice === 'stylebertvits2'
+                ? finalizeStyleBertVits2Tail(doneAfterBg)
+                : doneAfterBg
 
-            hasSpeakBeenCalled =
-              handleSpeakAndStateUpdate(
-                sessionId,
-                doneAfterBg,
-                currentEmotionTag,
-                assistantMessageListRef,
-                currentSlideMessagesRef,
-                currentMotionTag || undefined
-              ) || hasSpeakBeenCalled
+            if (
+              tailText &&
+              (settingsStore.getState().selectVoice !== 'stylebertvits2' ||
+                !isInvalidStandaloneTtsUnit(tailText))
+            ) {
+              hasSpeakBeenCalled =
+                handleSpeakAndStateUpdate(
+                  sessionId,
+                  tailText,
+                  currentEmotionTag,
+                  assistantMessageListRef,
+                  currentSlideMessagesRef,
+                  currentMotionTag || undefined
+                ) || hasSpeakBeenCalled
+            }
           } else {
             console.warn(
               'Stream ended while still in code block state. Saving remaining code.',
@@ -1208,18 +1220,19 @@ export const handleReceiveTextFromWsFn =
         const lastContent =
           typeof lastMessage.content === 'string'
             ? lastMessage.content
-            : Array.isArray(lastMessage.content)
-              ? lastMessage.content[0].text
-              : ''
+            : getTextFromMessageContent(lastMessage.content)
 
         const appendedText = lastContent + text
+        const imageUrl = getImageFromMessageContent(lastMessage.content)
         const appendedContent: Message['content'] = Array.isArray(
           lastMessage.content
         )
-          ? [
-              { type: 'text' as const, text: appendedText },
-              lastMessage.content[1],
-            ]
+          ? imageUrl
+            ? [
+                { type: 'text' as const, text: appendedText },
+                { type: 'image' as const, image: imageUrl },
+              ]
+            : appendedText
           : appendedText
 
         homeStore.getState().upsertMessage({

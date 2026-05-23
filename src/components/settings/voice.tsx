@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 
 import {
@@ -21,6 +21,11 @@ import { TextButton } from '../textButton'
 import speakers from '../speakers.json'
 // import speakers_aivis from '../speakers_aivis.json'
 import { useRestrictedMode } from '@/hooks/useRestrictedMode'
+import {
+  formatSbv2ModelOptionLabel,
+  formatStyleBertVits2StyleOptionLabel,
+  getStyleBertVits2StyleDescription,
+} from '@/utils/styleBertVits2StyleDescriptions'
 
 const Voice = () => {
   const { isRestrictedMode } = useRestrictedMode()
@@ -98,6 +103,83 @@ const Voice = () => {
   const [speakers_aivis, setSpeakers_aivis] = useState<Array<any>>([])
   const [speakers_voicevox, setSpeakers_voicevox] = useState<Array<any>>([])
   const [customVoiceText, setCustomVoiceText] = useState<string>('')
+  const [sbv2Models, setSbv2Models] = useState<
+    Array<{
+      modelId: string
+      label: string
+      styles: string[]
+      speakers: string[]
+    }>
+  >([])
+  const [sbv2ModelsLoading, setSbv2ModelsLoading] = useState(false)
+
+  const fetchSbv2Models = useCallback(async () => {
+    const url = settingsStore.getState().stylebertvits2ServerUrl.trim()
+    if (!url) return
+
+    setSbv2ModelsLoading(true)
+    try {
+      const res = await fetch(
+        `/api/stylebertvits2-models?serverUrl=${encodeURIComponent(url)}`
+      )
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to load models')
+      }
+      setSbv2Models(data.models || [])
+
+      const currentId = settingsStore.getState().stylebertvits2ModelId
+      const current = (data.models || []).find(
+        (m: { modelId: string }) => m.modelId === currentId
+      )
+      const first = data.models?.[0]
+      const target = current || first
+      if (target) {
+        const styles: string[] = target.styles || []
+        const currentStyle = settingsStore.getState().stylebertvits2Style
+        const updates: {
+          stylebertvits2ModelId?: string
+          stylebertvits2Style?: string
+        } = {}
+
+        // 会話中の model_id 切替を防ぐ: 有効な選択があるときは上書きしない
+        if (!current) {
+          updates.stylebertvits2ModelId = target.modelId
+        }
+
+        if (styles.length > 0 && !styles.includes(currentStyle)) {
+          updates.stylebertvits2Style = styles[0] || 'Neutral'
+        }
+
+        if (Object.keys(updates).length > 0) {
+          settingsStore.setState(updates)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch SBV2 models:', error)
+      setSbv2Models([])
+    } finally {
+      setSbv2ModelsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (
+      selectVoice === 'stylebertvits2' &&
+      stylebertvits2ServerUrl.trim() &&
+      sbv2Models.length === 0 &&
+      !sbv2ModelsLoading
+    ) {
+      fetchSbv2Models()
+    }
+  }, [
+    selectVoice,
+    stylebertvits2ServerUrl,
+    sbv2Models.length,
+    sbv2ModelsLoading,
+    fetchSbv2Models,
+  ])
+
   const [isUpdatingSpeakers, setIsUpdatingSpeakers] = useState<boolean>(false)
   const [speakersUpdateError, setSpeakersUpdateError] = useState<string>('')
   const [isUpdatingVoicevoxSpeakers, setIsUpdatingVoicevoxSpeakers] =
@@ -495,6 +577,19 @@ const Voice = () => {
               </>
             )
           } else if (selectVoice === 'stylebertvits2') {
+            const selectedSbv2Model = sbv2Models.find(
+              (m) => m.modelId === stylebertvits2ModelId
+            )
+            const availableStyles = selectedSbv2Model?.styles?.length
+              ? selectedSbv2Model.styles
+              : sbv2Models.length === 0
+                ? [stylebertvits2Style].filter(Boolean)
+                : ['Neutral']
+
+            const currentStyleDescription = getStyleBertVits2StyleDescription(
+              stylebertvits2Style
+            )
+
             return (
               <>
                 <div className="my-2 text-sm whitespace-pre-wrap">
@@ -514,7 +609,7 @@ const Voice = () => {
                   <input
                     className="text-ellipsis px-4 py-2 w-full bg-white hover:bg-white-hover rounded-lg"
                     type="text"
-                    placeholder="..."
+                    placeholder={t('StyleBeatVITS2ServerURLPlaceholder')}
                     value={stylebertvits2ServerUrl}
                     onChange={(e) =>
                       settingsStore.setState({
@@ -523,6 +618,23 @@ const Voice = () => {
                     }
                   />
                 </div>
+                <div className="mt-3">
+                  <TextButton
+                    onClick={fetchSbv2Models}
+                    disabled={!stylebertvits2ServerUrl.trim() || sbv2ModelsLoading}
+                  >
+                    {sbv2ModelsLoading
+                      ? '...'
+                      : t('StyleBeatVITS2RefreshModels')}
+                  </TextButton>
+                  {sbv2Models.length > 0 && (
+                    <span className="ml-3 text-sm text-gray-600">
+                      {t('StyleBeatVITS2ModelsLoaded', {
+                        count: sbv2Models.length,
+                      })}
+                    </span>
+                  )}
+                </div>
                 <div className="mt-4 font-bold">
                   {t('StyleBeatVITS2ApiKey')}
                 </div>
@@ -530,7 +642,7 @@ const Voice = () => {
                   <input
                     className="text-ellipsis px-4 py-2 w-full bg-white hover:bg-white-hover rounded-lg"
                     type="text"
-                    placeholder="..."
+                    placeholder="（ローカルは空で可）"
                     value={stylebertvits2ApiKey}
                     onChange={(e) =>
                       settingsStore.setState({
@@ -540,34 +652,93 @@ const Voice = () => {
                   />
                 </div>
                 <div className="mt-4 font-bold">
-                  {t('StyleBeatVITS2ModelID')}
+                  {t('StyleBeatVITS2SelectModel')}
                 </div>
                 <div className="mt-2">
-                  <input
-                    className="text-ellipsis px-4 py-2 w-full bg-white hover:bg-white-hover rounded-lg"
-                    type="number"
-                    placeholder="..."
-                    value={stylebertvits2ModelId}
-                    onChange={(e) =>
-                      settingsStore.setState({
-                        stylebertvits2ModelId: e.target.value,
-                      })
-                    }
-                  />
+                  {sbv2Models.length > 0 ? (
+                    <select
+                      className="text-ellipsis px-4 py-2 w-full bg-white hover:bg-white-hover rounded-lg"
+                      value={stylebertvits2ModelId}
+                      onChange={(e) => {
+                        const modelId = e.target.value
+                        const model = sbv2Models.find((m) => m.modelId === modelId)
+                        settingsStore.setState({
+                          stylebertvits2ModelId: modelId,
+                          stylebertvits2Style:
+                            model?.styles?.[0] || stylebertvits2Style,
+                        })
+                      }}
+                    >
+                      {sbv2Models.map((model) => (
+                        <option key={model.modelId} value={model.modelId}>
+                          {formatSbv2ModelOptionLabel(
+                            model.label,
+                            model.modelId,
+                            model.speakers
+                          )}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      className="text-ellipsis px-4 py-2 w-full bg-white hover:bg-white-hover rounded-lg"
+                      type="number"
+                      placeholder="0"
+                      value={stylebertvits2ModelId}
+                      onChange={(e) =>
+                        settingsStore.setState({
+                          stylebertvits2ModelId: e.target.value,
+                        })
+                      }
+                    />
+                  )}
                 </div>
                 <div className="mt-4 font-bold">{t('StyleBeatVITS2Style')}</div>
+                <p className="mt-1 text-xs text-gray-600 whitespace-pre-wrap">
+                  {t('StyleBeatVITS2StyleSelectHint')}
+                </p>
                 <div className="mt-2">
-                  <input
-                    className="text-ellipsis px-4 py-2 w-full bg-white hover:bg-white-hover rounded-lg"
-                    type="text"
-                    placeholder="..."
-                    value={stylebertvits2Style}
-                    onChange={(e) =>
-                      settingsStore.setState({
-                        stylebertvits2Style: e.target.value,
-                      })
-                    }
-                  />
+                  {sbv2Models.length > 0 && availableStyles.length > 0 ? (
+                    <select
+                      className="text-ellipsis px-4 py-2 w-full bg-white hover:bg-white-hover rounded-lg"
+                      value={
+                        availableStyles.includes(stylebertvits2Style)
+                          ? stylebertvits2Style
+                          : availableStyles[0]
+                      }
+                      onChange={(e) =>
+                        settingsStore.setState({
+                          stylebertvits2Style: e.target.value,
+                        })
+                      }
+                    >
+                      {availableStyles.map((style) => (
+                        <option key={style} value={style}>
+                          {formatStyleBertVits2StyleOptionLabel(style)}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      className="text-ellipsis px-4 py-2 w-full bg-white hover:bg-white-hover rounded-lg"
+                      type="text"
+                      placeholder="Neutral"
+                      value={stylebertvits2Style}
+                      onChange={(e) =>
+                        settingsStore.setState({
+                          stylebertvits2Style: e.target.value,
+                        })
+                      }
+                    />
+                  )}
+                </div>
+                <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                  <div className="text-xs font-bold text-gray-700 mb-1">
+                    {t('StyleBeatVITS2StyleDescription')}
+                  </div>
+                  <p className="text-sm text-gray-800 leading-relaxed">
+                    {currentStyleDescription}
+                  </p>
                 </div>
                 <div className="mt-4 font-bold">
                   {t('StyleBeatVITS2SdpRatio')}: {stylebertvits2SdpRatio}

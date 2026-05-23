@@ -231,8 +231,9 @@ const createSpeakCharacter = () => {
 
     const processAndSynthesizePromise = prevFetchPromise.then(async () => {
       const now = Date.now()
-      if (now - lastTime < 1000) {
-        await wait(1000 - (now - lastTime))
+      const minGapMs = ss.selectVoice === 'stylebertvits2' ? 0 : 1000
+      if (minGapMs > 0 && now - lastTime < minGapMs) {
+        await wait(minGapMs - (now - lastTime))
       }
 
       // ボタン停止でキャンセルされた場合はここで終了

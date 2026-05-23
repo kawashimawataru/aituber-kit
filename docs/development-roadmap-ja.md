@@ -10,6 +10,7 @@
 |------|--------|
 | **エージェントはここから** | [project/README.md](project/README.md) |
 | **今の進捗・次のタスク** | [dev-log/STATUS.md](dev-log/STATUS.md) |
+| **Irodori-TTS 移行（将来）** | [project/irodori-tts-migration.md](project/irodori-tts-migration.md) |
 | **全体索引** | [README.md](README.md) |
 | **フェーズ一覧** | [project/phases/README.md](project/phases/README.md) |
 

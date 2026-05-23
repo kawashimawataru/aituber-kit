@@ -24,5 +24,7 @@
 | 体を傾ける（会話連動） | △ ポーズ自作のみ | stunt lean カタログ + 素材 | 6 |
 | 背景（手動） | ○ 画像/緑/カメラ背景 | 維持 | — |
 | 背景（AI・ムード連動） | × | `[bg:*]` + フェード | 6.8 |
+| TTS（SBV2） | ○ ローカル API | 検証・フォールバック維持 | — |
+| TTS（Irodori-TTS） | × | 絵文字感情・共演向け | 将来 → [irodori-tts-migration.md](irodori-tts-migration.md) |
 
 ---

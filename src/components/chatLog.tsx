@@ -6,6 +6,10 @@ import { EMOTIONS } from '@/features/messages/messages'
 import homeStore from '@/features/stores/home'
 import settingsStore from '@/features/stores/settings'
 import { messageSelectors } from '@/features/messages/messageSelectors'
+import {
+  getImageFromMessageContent,
+  getTextFromMessageContent,
+} from '@/utils/multimodalContent'
 
 export const ChatLog = () => {
   const chatScrollRef = useRef<HTMLDivElement>(null)
@@ -96,7 +100,7 @@ export const ChatLog = () => {
                 <>
                   <Chat
                     role={msg.role}
-                    message={msg.content ? msg.content[0].text : ''}
+                    message={getTextFromMessageContent(msg.content)}
                     thinking={msg.thinking}
                     characterName={characterName}
                     userName={msg.userName}
@@ -104,7 +108,7 @@ export const ChatLog = () => {
                   />
                   <ChatImage
                     role={msg.role}
-                    imageUrl={msg.content ? msg.content[1].image : ''}
+                    imageUrl={getImageFromMessageContent(msg.content)}
                     characterName={characterName}
                   />
                 </>

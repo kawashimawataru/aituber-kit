@@ -1,5 +1,9 @@
 import { Message } from './messages'
 import settingsStore from '@/features/stores/settings'
+import {
+  getImageFromMessageContent,
+  getTextFromMessageContent,
+} from '@/utils/multimodalContent'
 
 export const messageSelectors = {
   // テキストまたは画像を含むメッセージのみを取得
@@ -41,9 +45,7 @@ export const messageSelectors = {
       .map((message, index) => {
         // 最後のメッセージだけそのまま利用する（= 最後のメッセージだけマルチモーダルの対象となる）
         const isLastMessage = index === messages.length - 1
-        let messageText = Array.isArray(message.content)
-          ? message.content[0].text
-          : message.content || ''
+        let messageText = getTextFromMessageContent(message.content)
 
         // userメッセージにuserNameがある場合、コンテンツの先頭にコメント主名を付与
         if (message.role === 'user' && message.userName) {
@@ -58,14 +60,20 @@ export const messageSelectors = {
           if (isLastMessage && Array.isArray(message.content)) {
             content = [
               { type: 'text', text: content },
-              { type: 'image', image: message.content[1].image },
+              {
+                type: 'image',
+                image: getImageFromMessageContent(message.content),
+              },
             ]
           }
         } else {
           if (isLastMessage && Array.isArray(message.content)) {
             content = [
               { type: 'text', text: messageText },
-              { type: 'image', image: message.content[1].image },
+              {
+                type: 'image',
+                image: getImageFromMessageContent(message.content),
+              },
             ]
           } else {
             content = messageText
@@ -127,11 +135,7 @@ export const messageSelectors = {
             }
           }
         } else {
-          const text = item.content
-            ? typeof item.content != 'string'
-              ? item.content[0].text
-              : item.content
-            : ''
+          const text = getTextFromMessageContent(item.content)
           if (lastImageUrl != '') {
             acc.push({
               ...item,
@@ -159,7 +163,7 @@ export const messageSelectors = {
           ? ''
           : typeof message.content === 'string'
             ? message.content
-            : message.content[0].text,
+            : getTextFromMessageContent(message.content),
     }))
   },
 

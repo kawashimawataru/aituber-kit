@@ -5,6 +5,7 @@ import homeStore from '@/features/stores/home'
 import settingsStore from '@/features/stores/settings'
 import { Live2DHandler } from '@/features/messages/live2dHandler'
 import { debounce } from 'lodash'
+import toastStore from '@/features/stores/toast'
 
 console.log('Live2DComponent module loaded')
 
@@ -131,7 +132,14 @@ const Live2DComponent = (): JSX.Element => {
     modelPath: string
   ) => {
     if (!canvasContainerRef.current) return
-    const hs = homeStore.getState()
+
+    if (!(window as any).Live2DCubismCore) {
+      console.error(
+        '[Live2D] window.Live2DCubismCore is not defined. ' +
+        'Place live2dcubismcore.min.js at public/scripts/live2dcubismcore.min.js'
+      )
+      return
+    }
 
     try {
       const newModel = await Live2DModel.fromSync(modelPath, {
@@ -159,6 +167,13 @@ const Live2DComponent = (): JSX.Element => {
       await Live2DHandler.resetToIdle()
     } catch (error) {
       console.error('Failed to load Live2D model:', error)
+      homeStore.setState({ live2dViewer: null })
+      toastStore.getState().addToast({
+        message:
+          'Live2Dモデルの読み込みに失敗しました。設定で別モデルを選ぶか、model3.json とテクスチャのパスを確認してください。',
+        type: 'error',
+        tag: 'live2d-model-load',
+      })
     }
   }
 
@@ -171,12 +186,22 @@ const Live2DComponent = (): JSX.Element => {
     })
     return () => {
       cancelAnimationFrame(rafId)
+      Live2DHandler.dispose()
+      homeStore.setState({ live2dViewer: null })
       if (modelRef.current) {
-        modelRef.current.destroy()
+        try {
+          modelRef.current.destroy()
+        } catch {
+          // ignore teardown errors
+        }
         modelRef.current = null
       }
       if (appRef.current) {
-        appRef.current.destroy()
+        appRef.current.destroy(true, {
+          children: true,
+          texture: true,
+          baseTexture: true,
+        })
         appRef.current = null
       }
       setApp(null)

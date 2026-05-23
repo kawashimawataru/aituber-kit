@@ -13,6 +13,8 @@ import { TextButton } from '../textButton'
 import { ToggleSwitch } from '../toggleSwitch'
 import { useLive2DEnabled } from '@/hooks/useLive2DEnabled'
 import { useRestrictedMode } from '@/hooks/useRestrictedMode'
+import { syncLive2DEmotionsFromModel } from '@/utils/live2dEmotionSync'
+import type { Live2DModelInfo } from '@/lib/live2d/importModels'
 
 // Character型の定義
 type Character = Pick<
@@ -692,6 +694,7 @@ const Character = () => {
     characterName,
     selectedVrmPath,
     selectedLive2DPath,
+    live2dImportSourcePath,
     selectedPNGTuberPath,
     pngTuberSensitivity,
     pngTuberChromaKeyEnabled,
@@ -719,12 +722,12 @@ const Character = () => {
     poseConfigs,
   } = settingsStore()
   const [vrmFiles, setVrmFiles] = useState<string[]>([])
-  const [live2dModels, setLive2dModels] = useState<
-    Array<{ path: string; name: string }>
-  >([])
+  const [live2dModels, setLive2dModels] = useState<Live2DModelInfo[]>([])
   const [pngTuberModels, setPngTuberModels] = useState<
     Array<{ path: string; name: string; videoFile?: string }>
   >([])
+  const live2dFolderInputRef = useRef<HTMLInputElement>(null)
+  const [live2dImporting, setLive2dImporting] = useState(false)
 
   // クロマキー用動画プレビュー
   const chromaKeyVideoRef = useRef<HTMLVideoElement>(null)
@@ -821,7 +824,16 @@ const Character = () => {
     if (isLive2DEnabled) {
       fetch('/api/get-live2d-list')
         .then((res) => res.json())
-        .then((models) => setLive2dModels(models))
+        .then((models) => {
+          if (!Array.isArray(models)) return
+          setLive2dModels(models)
+          const current = settingsStore.getState().selectedLive2DPath
+          const exists = models.some((m: Live2DModel) => m.path === current)
+          if (!exists && models.length > 0) {
+            settingsStore.setState({ selectedLive2DPath: models[0].path })
+            syncLive2DEmotionsFromModel(models[0])
+          }
+        })
         .catch((error) => {
           console.error('Error fetching Live2D list:', error)
         })
@@ -833,7 +845,21 @@ const Character = () => {
       .catch((error) => {
         console.error('Error fetching PNGTuber list:', error)
       })
-  }, [])
+  }, [isLive2DEnabled])
+
+  const refreshLive2DList = useCallback(async () => {
+    if (!isLive2DEnabled) return
+    try {
+      const res = await fetch('/api/get-live2d-list')
+      const models = await res.json()
+      if (Array.isArray(models)) {
+        setLive2dModels(models)
+      }
+    } catch (error) {
+      console.error('Error fetching Live2D list:', error)
+    }
+  }, [isLive2DEnabled])
+
   const handlePositionAction = (action: 'fix' | 'unfix' | 'reset') => {
     try {
       const { viewer, live2dViewer } = homeStore.getState()
@@ -910,8 +936,142 @@ const Character = () => {
     }
   }
 
+  const handleLive2dImportFromPath = async () => {
+    const sourcePath = live2dImportSourcePath.trim()
+
+    setLive2dImporting(true)
+    try {
+      const response = await fetch('/api/import-live2d-from-path', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          sourcePath ? { sourcePath } : {}
+        ),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.message || data.error || 'Import failed')
+      }
+
+      if (data.sourcePath && !live2dImportSourcePath.trim()) {
+        settingsStore.setState({ live2dImportSourcePath: data.sourcePath })
+      }
+
+      await refreshLive2DList()
+      if (data.imported?.length > 0) {
+        const first = data.imported[0]
+        settingsStore.setState({ selectedLive2DPath: first.path })
+        syncLive2DEmotionsFromModel(first)
+      }
+
+      toastStore.getState().addToast({
+        message: t('Live2D.ImportSuccess', { count: data.count ?? 0 }),
+        type: 'success',
+        tag: 'live2d-import',
+      })
+      if (data.skipped?.length > 0) {
+        toastStore.getState().addToast({
+          message: t('Live2D.ImportSkipped', {
+            count: data.skipped.length,
+          }),
+          type: 'info',
+          tag: 'live2d-import-skipped',
+        })
+      }
+    } catch (error) {
+      console.error('Live2D path import failed:', error)
+      toastStore.getState().addToast({
+        message: t('Live2D.ImportFailed'),
+        type: 'error',
+        tag: 'live2d-import-error',
+      })
+    } finally {
+      setLive2dImporting(false)
+    }
+  }
+
+  const handleLive2dFolderUpload = async (files: FileList | null) => {
+    if (!files?.length) return
+
+    setLive2dImporting(true)
+    const formData = new FormData()
+    Array.from(files).forEach((file) => {
+      const rel =
+        (file as File & { webkitRelativePath?: string }).webkitRelativePath ||
+        file.name
+      formData.append('files', file, rel)
+    })
+
+    try {
+      const response = await fetch('/api/upload-live2d-folder', {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Upload failed')
+      }
+
+      await refreshLive2DList()
+      if (data.imported?.length > 0) {
+        const first = data.imported[0]
+        settingsStore.setState({ selectedLive2DPath: first.path })
+        syncLive2DEmotionsFromModel(first)
+      }
+
+      toastStore.getState().addToast({
+        message: t('Live2D.ImportSuccess', { count: data.count ?? 0 }),
+        type: 'success',
+        tag: 'live2d-upload',
+      })
+    } catch (error) {
+      console.error('Live2D folder upload failed:', error)
+      toastStore.getState().addToast({
+        message: t('Live2D.ImportFailed'),
+        type: 'error',
+        tag: 'live2d-upload-error',
+      })
+    } finally {
+      setLive2dImporting(false)
+      if (live2dFolderInputRef.current) {
+        live2dFolderInputRef.current.value = ''
+      }
+    }
+  }
+
+  const handleOpenLive2dStorage = async () => {
+    try {
+      const response = await fetch('/api/open-live2d-storage', {
+        method: 'POST',
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error)
+      }
+    } catch (error) {
+      console.error('Open live2d storage failed:', error)
+      toastStore.getState().addToast({
+        message: t('Live2D.OpenStorageFailed', {
+          path: 'public/live2d',
+        }),
+        type: 'error',
+        tag: 'live2d-open-storage',
+      })
+    }
+  }
+
   return (
     <>
+      <input
+        ref={live2dFolderInputRef}
+        type="file"
+        className="hidden"
+        // @ts-expect-error webkitdirectory is non-standard but supported
+        webkitdirectory=""
+        directory=""
+        multiple
+        onChange={(e) => handleLive2dFolderUpload(e.target.files)}
+      />
       <div className="flex items-center mb-6">
         <Image
           src="/images/setting-icons/character-settings.svg"
@@ -1029,20 +1189,75 @@ const Character = () => {
             <div className="my-2 text-sm whitespace-pre-wrap">
               {t('Live2D.FileInfo')}
             </div>
-            <select
-              className="text-ellipsis px-4 py-2 w-full sm:w-col-span-2 bg-white hover:bg-white-hover rounded-lg mb-2"
-              value={selectedLive2DPath}
-              onChange={(e) => {
-                const path = e.target.value
-                settingsStore.setState({ selectedLive2DPath: path })
-              }}
-            >
-              {live2dModels.map((model) => (
-                <option key={model.path} value={model.path}>
-                  {model.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex gap-2 items-center mb-2">
+              <select
+                className="text-ellipsis px-4 py-2 flex-1 bg-white hover:bg-white-hover rounded-lg"
+                value={selectedLive2DPath}
+                onChange={(e) => {
+                  const path = e.target.value
+                  settingsStore.setState({ selectedLive2DPath: path })
+                  const model = live2dModels.find((m) => m.path === path)
+                  if (model) syncLive2DEmotionsFromModel(model)
+                }}
+              >
+                {live2dModels.length === 0 && (
+                  <option value="">{t('Live2D.NoModels')}</option>
+                )}
+                {live2dModels.map((model) => (
+                  <option key={model.path} value={model.path}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+              <TextButton
+                onClick={refreshLive2DList}
+                disabled={isRestrictedMode}
+              >
+                {t('Live2D.RefreshList')}
+              </TextButton>
+            </div>
+
+            <div className="my-4 space-y-3 p-4 bg-white rounded-lg border border-gray-100">
+              <div className="text-sm font-medium">
+                {t('Live2D.ImportSourcePath')}
+              </div>
+              <input
+                type="text"
+                className="text-ellipsis px-4 py-2 w-full bg-white hover:bg-white-hover rounded-lg text-sm"
+                value={live2dImportSourcePath}
+                placeholder={t('Live2D.ImportSourcePathPlaceholder')}
+                onChange={(e) =>
+                  settingsStore.setState({
+                    live2dImportSourcePath: e.target.value,
+                  })
+                }
+                disabled={isRestrictedMode}
+              />
+              <p className="text-xs text-gray-600 whitespace-pre-wrap">
+                {t('Live2D.ImportFromPathHint')}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <TextButton
+                  onClick={handleLive2dImportFromPath}
+                  disabled={isRestrictedMode || live2dImporting}
+                >
+                  {t('Live2D.ImportFromPath')}
+                </TextButton>
+                <TextButton
+                  onClick={() => live2dFolderInputRef.current?.click()}
+                  disabled={isRestrictedMode || live2dImporting}
+                >
+                  {t('Live2D.SelectFolderUpload')}
+                </TextButton>
+                <TextButton
+                  onClick={handleOpenLive2dStorage}
+                  disabled={isRestrictedMode}
+                >
+                  {t('Live2D.OpenStorageFolder')}
+                </TextButton>
+              </div>
+            </div>
+
             <div className="my-4">
               <Live2DSettingsForm />
             </div>

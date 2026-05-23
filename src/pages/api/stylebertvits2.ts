@@ -19,78 +19,61 @@ const getLanguageCode = (selectLanguage: string): string => {
   }
 }
 
+function resolveServerUrl(bodyUrl?: string): string {
+  const url = (
+    bodyUrl?.trim() ||
+    process.env.STYLEBERTVITS2_SERVER_URL ||
+    process.env.NEXT_PUBLIC_STYLEBERTVITS2_SERVER_URL ||
+    ''
+  ).trim()
+  if (!url) {
+    throw new Error(
+      'Style-Bert-VITS2 サーバーURLが未設定です。設定→音声で「http://127.0.0.1:5050」などを入力するか、.env に STYLEBERTVITS2_SERVER_URL を設定して dev サーバーを再起動してください。'
+    )
+  }
+  return url.replace(/\/$/, '')
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<Data>
 ) {
-  const body = req.body // JSON.parse を削除
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' })
+  }
+
+  const body = req.body
   const message = body.message
-  const stylebertvits2ModelId = body.stylebertvits2ModelId
-  const stylebertvits2ServerUrl =
-    body.stylebertvits2ServerUrl || process.env.STYLEBERTVITS2_SERVER_URL
+  const stylebertvits2ModelId = String(body.stylebertvits2ModelId ?? '0')
   const stylebertvits2ApiKey =
     body.stylebertvits2ApiKey || process.env.STYLEBERTVITS2_API_KEY
-  const stylebertvits2Style = body.stylebertvits2Style
-  const stylebertvits2SdpRatio = body.stylebertvits2SdpRatio
-  const stylebertvits2Length = body.stylebertvits2Length
-  const selectLanguage = getLanguageCode(body.selectLanguage)
+  const stylebertvits2Style = body.stylebertvits2Style || 'Neutral'
+  const stylebertvits2SdpRatio = body.stylebertvits2SdpRatio ?? 0.2
+  const stylebertvits2Length = body.stylebertvits2Length ?? 1.0
+  const selectLanguage = getLanguageCode(body.selectLanguage || 'ja')
 
   try {
-    if (!stylebertvits2ServerUrl.includes('https://api.runpod.ai')) {
-      const queryParams = new URLSearchParams({
-        text: message,
-        model_id: stylebertvits2ModelId,
-        style: stylebertvits2Style,
-        sdp_ratio: stylebertvits2SdpRatio,
-        length: stylebertvits2Length,
-        language: selectLanguage,
-      })
+    const stylebertvits2ServerUrl = resolveServerUrl(body.stylebertvits2ServerUrl)
 
-      const voice = await fetch(
-        `${stylebertvits2ServerUrl.replace(/\/$/, '')}/voice?${queryParams}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'audio/wav',
+    if (stylebertvits2ServerUrl.includes('https://api.runpod.ai')) {
+      const voice = await fetch(stylebertvits2ServerUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${stylebertvits2ApiKey}`,
+        },
+        body: JSON.stringify({
+          input: {
+            action: '/voice',
+            model_id: stylebertvits2ModelId,
+            text: message,
+            style: stylebertvits2Style,
+            sdp_ratio: stylebertvits2SdpRatio,
+            length: stylebertvits2Length,
+            language: selectLanguage,
           },
-        }
-      )
-
-      if (!voice.ok) {
-        throw new Error(
-          `サーバーからの応答が異常です。ステータスコード: ${voice.status}`
-        )
-      }
-
-      const arrayBuffer = await voice.arrayBuffer()
-      const buffer = Buffer.from(arrayBuffer)
-      res.writeHead(200, {
-        'Content-Type': 'audio/wav',
-        'Content-Length': buffer.length,
+        }),
       })
-      res.end(buffer)
-    } else {
-      const voice = await fetch(
-        `${stylebertvits2ServerUrl.replace(/\/$/, '')}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${stylebertvits2ApiKey}`,
-          },
-          body: JSON.stringify({
-            input: {
-              action: '/voice',
-              model_id: stylebertvits2ModelId,
-              text: message,
-              style: stylebertvits2Style,
-              sdp_ratio: stylebertvits2SdpRatio,
-              length: stylebertvits2Length,
-              language: selectLanguage,
-            },
-          }),
-        }
-      )
 
       if (!voice.ok) {
         throw new Error(
@@ -107,8 +90,64 @@ export default async function handler(
         'Content-Length': buffer.length,
       })
       res.end(buffer)
+      return
     }
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
+
+    const queryParams = new URLSearchParams({
+      text: message,
+      model_id: stylebertvits2ModelId,
+      style: stylebertvits2Style,
+      sdp_ratio: String(stylebertvits2SdpRatio),
+      length: String(stylebertvits2Length),
+      language: selectLanguage,
+    })
+
+    const postBody = {
+      text: message,
+      model_id: stylebertvits2ModelId,
+      style: stylebertvits2Style,
+      sdp_ratio: stylebertvits2SdpRatio,
+      length: stylebertvits2Length,
+      language: selectLanguage,
+    }
+
+    let voice = await fetch(`${stylebertvits2ServerUrl}/voice`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'audio/wav',
+      },
+      body: JSON.stringify(postBody),
+    })
+
+    if (voice.status === 405 || voice.status === 404) {
+      const voiceUrl = `${stylebertvits2ServerUrl}/voice?${queryParams}`
+      voice = await fetch(voiceUrl, {
+        method: 'GET',
+        headers: {
+          Accept: 'audio/wav',
+        },
+      })
+    }
+
+    if (!voice.ok) {
+      const errText = await voice.text().catch(() => '')
+      throw new Error(
+        `SBV2 エラー (${voice.status}): ${errText.slice(0, 300) || voice.statusText} — URL: ${stylebertvits2ServerUrl}/voice`
+      )
+    }
+
+    const arrayBuffer = await voice.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+    res.writeHead(200, {
+      'Content-Type': 'audio/wav',
+      'Content-Length': buffer.length,
+    })
+    res.end(buffer)
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : 'StyleBertVITS2 synthesis failed'
+    console.error('[stylebertvits2]', message)
+    res.status(500).json({ error: message })
   }
 }

@@ -16,6 +16,7 @@
 | 身体性演出 | `[stunt:xxx]` タグ・画面シェイク・SE 同時発火 **（実装済）** | `stuntScheduler.ts`, `screenShake.ts`, `stuntTypes.ts`（11 stunt） |
 | 背景演出 | `[bg:xxx]` タグで LLM 起点の背景切替 **（実装済）** | `extractAndApplyBgTag`, 0.8s CSS transition |
 | ログ | JSONL エクスポート **（実装済）** | `exportChatLog.ts`, 設定→その他→ダウンロードボタン |
+| TTS | **Style-Bert-VITS2（実装済）** / OpenAI TTS 等 | 将来 **Irodori-TTS** へ移行予定 → [irodori-tts-migration.md](irodori-tts-migration.md) |
 
 ### pngtuber-main から持ってこれる知見（コード参照用）
 

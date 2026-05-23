@@ -72,6 +72,7 @@ flowchart LR
 | [obs-streaming-guide.md](obs-streaming-guide.md) | OBS シーン構成・音声ルーティング・ブラウザソース設定 |
 | [onecomme-guide.md](onecomme-guide.md) | わんコメ連携設定・共演モード挙動・トラブルシューティング |
 | [e2e-youtube-checklist.md](e2e-youtube-checklist.md) | YouTube 共演配信 E2E チェックリスト |
+| [irodori-tts-migration.md](irodori-tts-migration.md) | **Irodori-TTS 移行計画**（SBV2 からの将来移行・ローカルパス） |
 | [phases/](phases/) | Phase 0〜6 のタスク・完了条件 |
 
 ---

@@ -1,10 +1,12 @@
 import { Talk } from './messages'
-import { SBV2_MERGE_MAX_CHARS } from '@/utils/ttsSentenceSplit'
+import {
+  SBV2_FIRST_CHUNK_SENTENCES,
+  SBV2_MERGE_MAX_CHARS,
+  SBV2_MAX_SENTENCES_PER_BATCH,
+} from '@/utils/ttsSentenceSplit'
 
-/** ストリーム中に届く連続文をまとめる待ち時間 */
+/** ストリーム終了待ち（残り文をまとめる） */
 const FLUSH_DEBOUNCE_MS = 250
-
-const SENTENCE_ENDED = /[。．.!?！？]$/
 
 export type Sbv2BatchSink = (
   sessionId: string,
@@ -13,8 +15,10 @@ export type Sbv2BatchSink = (
 ) => void
 
 /**
- * Style-Bert-VITS2: ストリームで句点ごとに分かれた発話を短時間バッファし、
- * 1回の /voice にまとめてから合成する（文間の不自然な無音・待ちを防ぐ）
+ * Style-Bert-VITS2:
+ * - 先頭1文 → 即 1 POST（最初の声を早く）
+ * - 以降 → 最大2文 / 80文字を \n 結合 + auto_split + split_interval
+ * - 先読み合成は PrefetchSpeakPipeline が担当
  */
 class Sbv2SpeakBatcher {
   private sink: Sbv2BatchSink | null = null
@@ -23,9 +27,21 @@ class Sbv2SpeakBatcher {
   private talkMeta: Pick<Talk, 'emotion' | 'motion'> = { emotion: 'neutral' }
   private flushTimer: ReturnType<typeof setTimeout> | null = null
   private pendingCompletes: Array<() => void> = []
+  private firstBatchSent = false
 
   setSink(sink: Sbv2BatchSink) {
     this.sink = sink
+  }
+
+  private joinedLength(): number {
+    return this.parts.join('\n').length
+  }
+
+  private shouldFlushBatch(): boolean {
+    return (
+      this.parts.length >= SBV2_MAX_SENTENCES_PER_BATCH ||
+      this.joinedLength() >= SBV2_MERGE_MAX_CHARS
+    )
   }
 
   enqueue(sessionId: string, talk: Talk, onComplete?: () => void) {
@@ -38,23 +54,26 @@ class Sbv2SpeakBatcher {
     if (sessionId !== this.sessionId) {
       this.flushNow()
       this.sessionId = sessionId
-    }
-
-    const mergedLen = this.parts.join('').length + text.length
-    if (mergedLen > SBV2_MERGE_MAX_CHARS && this.parts.length > 0) {
-      this.flushNow()
-      this.sessionId = sessionId
-    }
-
-    const lastPart = this.parts[this.parts.length - 1]
-    if (this.parts.length > 0 && SENTENCE_ENDED.test(lastPart.trim())) {
-      this.flushNow()
+      this.firstBatchSent = false
     }
 
     this.parts.push(text)
     if (talk.emotion) this.talkMeta.emotion = talk.emotion
     if (talk.motion) this.talkMeta.motion = talk.motion
     if (onComplete) this.pendingCompletes.push(onComplete)
+
+    if (
+      !this.firstBatchSent &&
+      this.parts.length >= SBV2_FIRST_CHUNK_SENTENCES
+    ) {
+      this.flushNow()
+      return
+    }
+
+    if (this.shouldFlushBatch()) {
+      this.flushNow()
+      return
+    }
 
     this.scheduleFlush()
   }
@@ -72,7 +91,7 @@ class Sbv2SpeakBatcher {
 
     if (this.parts.length === 0 || !this.sink) return
 
-    const message = this.parts.join('')
+    const message = this.parts.join('\n')
     const completes = this.pendingCompletes
     const sessionId = this.sessionId
     const talk: Talk = {
@@ -83,6 +102,7 @@ class Sbv2SpeakBatcher {
 
     this.parts = []
     this.pendingCompletes = []
+    this.firstBatchSent = true
 
     this.sink(sessionId, talk, () => {
       completes.forEach((cb) => {
@@ -101,6 +121,7 @@ class Sbv2SpeakBatcher {
     this.parts = []
     this.pendingCompletes = []
     this.sessionId = ''
+    this.firstBatchSent = false
   }
 }
 

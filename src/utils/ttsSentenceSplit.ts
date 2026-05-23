@@ -7,8 +7,21 @@ const MAJOR_SENTENCE_END = /[。．.!?！？\n]/
 const OPEN_QUOTE = /[「『（(\[]/g
 const CLOSE_QUOTE = /[」』）)\]]/g
 
-/** SBV2: 1リクエストにまとめる最大文字数（複数文の結合上限） */
-export const SBV2_MERGE_MAX_CHARS = 100
+/** SBV2: 1 POST にまとめる最大文字数 (安全網; 通常は MAX_SENTENCES で先にフラッシュ) */
+export const SBV2_MERGE_MAX_CHARS = 80
+
+/** SBV2: 先頭は即1文だけ送る（Time-to-first-audio 短縮） */
+export const SBV2_FIRST_CHUNK_SENTENCES = 1
+
+/**
+ * SBV2: 1 POST あたりの最大文数。
+ * 1文/バッチにすることで各合成が3-5秒に収まり、
+ * 先読みパイプラインが再生中に次バッチを完了できる。
+ */
+export const SBV2_MAX_SENTENCES_PER_BATCH = 1
+
+/** SBV2: auto_split 時の文間無音（秒）— 複数文を1バッチに結合する場合のみ使用 */
+export const SBV2_SPLIT_INTERVAL_SEC = 0.5
 
 function countMatches(text: string, re: RegExp): number {
   return (text.match(re) || []).length

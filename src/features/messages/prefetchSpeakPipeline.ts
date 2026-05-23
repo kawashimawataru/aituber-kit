@@ -11,8 +11,8 @@ import {
 /** 文と文の間の自然な間 — Irodori 等 */
 export const INTER_SENTENCE_PAUSE_MS = 150
 
-/** SBV2: 連続 WAV 再生の間（やや長めの息継ぎ） */
-export const SBV2_INTER_SENTENCE_PAUSE_MS = 500
+/** SBV2: バッチ WAV 間の最小間隔（split_interval=0.5s に合わせた自然な文間ポーズ） */
+export const SBV2_INTER_BATCH_PAUSE_MS = 500
 
 /** SBV2 等ローカル TTS の同時合成数（サーバー直列推論のため SBV2 は 1） */
 export const LOCAL_TTS_MAX_CONCURRENT_SYNTH = 2

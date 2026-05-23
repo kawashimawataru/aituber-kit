@@ -288,6 +288,10 @@ export function useVoiceRecognition({
   return {
     userMessage: currentHook.userMessage,
     isListening: currentHook.isListening,
+    isTranscribing:
+      'isTranscribing' in currentHook
+        ? (currentHook as { isTranscribing: boolean }).isTranscribing
+        : false,
     isProcessing:
       'isProcessing' in currentHook ? currentHook.isProcessing : false,
     silenceTimeoutRemaining: currentHook.silenceTimeoutRemaining,

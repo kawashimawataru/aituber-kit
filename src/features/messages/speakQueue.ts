@@ -6,7 +6,7 @@ import { PNGTuberHandler } from '@/features/pngTuber/pngTuberHandler'
 import { wait } from '@/utils/wait'
 import {
   INTER_SENTENCE_PAUSE_MS,
-  SBV2_INTER_SENTENCE_PAUSE_MS,
+  SBV2_INTER_BATCH_PAUSE_MS,
   PrefetchSpeakPipeline,
   usesPrefetchTts,
 } from './prefetchSpeakPipeline'
@@ -132,14 +132,14 @@ export class SpeakQueue {
         }
 
         const voice = settingsStore.getState().selectVoice
-        const interSentencePauseMs =
+        const interPauseMs =
           voice === 'stylebertvits2'
-            ? SBV2_INTER_SENTENCE_PAUSE_MS
+            ? SBV2_INTER_BATCH_PAUSE_MS
             : INTER_SENTENCE_PAUSE_MS
 
         if (this.lastPlaybackEndedAt > 0 && usesPrefetchTts(voice)) {
           const elapsed = Date.now() - this.lastPlaybackEndedAt
-          const remaining = interSentencePauseMs - elapsed
+          const remaining = interPauseMs - elapsed
           if (remaining > 0) {
             await wait(remaining)
           }

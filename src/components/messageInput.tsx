@@ -118,7 +118,6 @@ export const MessageInput = ({
       return () => clearInterval(interval)
     } else {
       if (textareaRef.current) {
-        textareaRef.current.value = ''
         const isTouchDevice = () => {
           if (typeof window === 'undefined') return false
           return (
@@ -163,12 +162,14 @@ export const MessageInput = ({
 
   // 音声認識中は入力欄を末尾までスクロール
   useEffect(() => {
-    if (!isMicRecording || !textareaRef.current) return
+    const isLiveInput =
+      isMicRecording || (isDeepgramTranscribing && userMessage.length > 0)
+    if (!isLiveInput || !textareaRef.current) return
     const el = textareaRef.current
     el.scrollTop = el.scrollHeight
     const len = userMessage.length
     el.setSelectionRange(len, len)
-  }, [userMessage, isMicRecording])
+  }, [userMessage, isMicRecording, isDeepgramTranscribing])
 
   // 共通の遅延行数更新処理
   const updateRowsWithDelay = useCallback(

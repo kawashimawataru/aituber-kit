@@ -194,7 +194,7 @@
   "StyleBeatVITS2ModelsFailed": "SBV2 に接続できません。サーバー起動と URL を確認してください",
   "StyleBeatVITS2SdpRatio": "SDP/DP混合比",
   "StyleBeatVITS2SdpRatioHint": "抑揚を強めたい場合は 0.3〜0.4 付近（既定 0.35）。上げすぎると不安定になることがあります。",
-  "StyleBeatVITS2TtsSplitHint": "SBV2 使用時は句点・終止符単位で送信し、「」の途中や「」ね！だけの断片には分割しません。",
+  "StyleBeatVITS2TtsSplitHint": "SBV2: 先頭1文を即合成し、以降は最大2文（80文字）ごとに改行結合して送信します。文間の間はサーバー split_interval（0.5秒）で WAV に挿入。再生中に次バッチを先読み合成します。",
   "StyleBeatVITS2Length": "話速",
   "ConversationHistory": "会話履歴",
   "ConversationHistoryInfo": "直近の会話が短期的な記憶として保持されます。",

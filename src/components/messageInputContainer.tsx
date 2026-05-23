@@ -21,6 +21,7 @@ export const MessageInputContainer = ({ onChatProcessStart }: Props) => {
   const {
     userMessage,
     isListening,
+    isTranscribing,
     silenceTimeoutRemaining,
     handleInputChange,
     handleSendMessage,
@@ -80,7 +81,7 @@ export const MessageInputContainer = ({ onChatProcessStart }: Props) => {
           speechRecognitionMode === 'deepgram')
       }
       isDeepgramTranscribing={
-        speechRecognitionMode === 'deepgram' && isListening
+        speechRecognitionMode === 'deepgram' && isTranscribing
       }
       showSpeechInputToggles={showSpeechInputToggles}
       speechRecognitionMode={speechRecognitionMode}

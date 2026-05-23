@@ -58,31 +58,14 @@ export function useDeepgramRecognition(
   const confirmedRef = useRef('')
   const partialRef = useRef('')
   const authKeyRef = useRef<string | null>(null)
-  const inputSyncTimerRef = useRef<number | null>(null)
 
-  const chatProcessing = homeStore((s) => s.chatProcessing)
+  const [isTranscribing, setIsTranscribing] = useState(false)
 
-  const syncInputFromTranscript = useCallback((immediate = false) => {
+  const syncInputFromTranscript = useCallback(() => {
     const display = [confirmedRef.current, partialRef.current]
       .filter(Boolean)
       .join(' ')
-
-    const apply = () => {
-      setUserMessage(display)
-      inputSyncTimerRef.current = null
-    }
-
-    if (immediate) {
-      if (inputSyncTimerRef.current !== null) {
-        clearTimeout(inputSyncTimerRef.current)
-        inputSyncTimerRef.current = null
-      }
-      apply()
-      return
-    }
-
-    if (inputSyncTimerRef.current !== null) return
-    inputSyncTimerRef.current = window.setTimeout(apply, 80)
+    setUserMessage(display)
   }, [])
 
   const stopSilenceWatcher = useCallback(() => {
@@ -165,6 +148,7 @@ export function useDeepgramRecognition(
       if (!utteranceActiveRef.current) return
 
       utteranceActiveRef.current = false
+      setIsTranscribing(false)
       stopPcmPipeline()
       closeDeepgramWs()
 
@@ -241,18 +225,10 @@ export function useDeepgramRecognition(
             transcript
           )
           partialRef.current = ''
-          syncInputFromTranscript(true)
+          syncInputFromTranscript()
         } else if (!isFinal && transcript) {
           updateSituation({ humanSpeaking: true })
-          if (partialRef.current && transcript === partialRef.current) {
-            confirmedRef.current = mergeDeepgramPartial(
-              confirmedRef.current,
-              partialRef.current
-            )
-            partialRef.current = ''
-          } else {
-            partialRef.current = transcript
-          }
+          partialRef.current = transcript
           syncInputFromTranscript()
         }
 
@@ -327,6 +303,7 @@ export function useDeepgramRecognition(
 
       utteranceStreamRef.current = stream
       utteranceActiveRef.current = true
+      setIsTranscribing(true)
       confirmedRef.current = ''
       partialRef.current = ''
       setUserMessage('')
@@ -494,6 +471,7 @@ export function useDeepgramRecognition(
   const stopListening = useCallback(async () => {
     isListeningRef.current = false
     setIsListening(false)
+    setIsTranscribing(false)
 
     await finalizeUtterance({ send: false })
     stopAlwaysOnLoop()
@@ -595,22 +573,7 @@ export function useDeepgramRecognition(
   }, [continuousMicListeningMode])
 
   useEffect(() => {
-    if (chatProcessing) {
-      if (inputSyncTimerRef.current !== null) {
-        clearTimeout(inputSyncTimerRef.current)
-        inputSyncTimerRef.current = null
-      }
-      setUserMessage('')
-      confirmedRef.current = ''
-      partialRef.current = ''
-    }
-  }, [chatProcessing])
-
-  useEffect(() => {
     return () => {
-      if (inputSyncTimerRef.current !== null) {
-        clearTimeout(inputSyncTimerRef.current)
-      }
       void stopListening()
     }
   }, [stopListening])
@@ -619,6 +582,7 @@ export function useDeepgramRecognition(
     () => ({
       userMessage,
       isListening,
+      isTranscribing,
       isProcessing: false,
       silenceTimeoutRemaining: null,
       handleInputChange,
@@ -631,6 +595,7 @@ export function useDeepgramRecognition(
     [
       userMessage,
       isListening,
+      isTranscribing,
       handleInputChange,
       handleSendMessage,
       toggleListening,

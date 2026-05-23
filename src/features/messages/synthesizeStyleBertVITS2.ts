@@ -1,5 +1,6 @@
 import { Talk } from './messages'
 import { Language } from '@/features/constants/settings'
+import { SBV2_SPLIT_INTERVAL_SEC } from '@/utils/ttsSentenceSplit'
 
 export async function synthesizeStyleBertVITS2Api(
   talk: Talk,
@@ -12,6 +13,7 @@ export async function synthesizeStyleBertVITS2Api(
   selectLanguage: Language
 ) {
   try {
+    const hasMultiline = talk.message.includes('\n')
     const body = {
       message: talk.message,
       stylebertvits2ServerUrl: stylebertvits2ServerUrl,
@@ -21,6 +23,8 @@ export async function synthesizeStyleBertVITS2Api(
       stylebertvits2SdpRatio: stylebertvits2SdpRatio,
       stylebertvits2Length: stylebertvits2Length,
       selectLanguage: selectLanguage,
+      auto_split: hasMultiline,
+      split_interval: hasMultiline ? SBV2_SPLIT_INTERVAL_SEC : undefined,
       type: 'stylebertvits2',
     }
 

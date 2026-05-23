@@ -54,6 +54,15 @@ export default async function handler(
   const stylebertvits2SdpRatio = body.stylebertvits2SdpRatio ?? 0.2
   const stylebertvits2Length = body.stylebertvits2Length ?? 1.0
   const selectLanguage = getLanguageCode(body.selectLanguage || 'ja')
+  const hasMultiline = message.includes('\n')
+  const autoSplit =
+    body.auto_split !== undefined ? Boolean(body.auto_split) : hasMultiline
+  const splitInterval =
+    body.split_interval !== undefined
+      ? Number(body.split_interval)
+      : autoSplit
+        ? 0.5
+        : undefined
 
   try {
     const stylebertvits2ServerUrl = resolveServerUrl(body.stylebertvits2ServerUrl)
@@ -103,17 +112,23 @@ export default async function handler(
       sdp_ratio: String(stylebertvits2SdpRatio),
       length: String(stylebertvits2Length),
       language: selectLanguage,
-      auto_split: 'false',
+      auto_split: String(autoSplit),
     })
+    if (splitInterval !== undefined) {
+      queryParams.set('split_interval', String(splitInterval))
+    }
 
-    const postBody = {
+    const postBody: Record<string, unknown> = {
       text: message,
       model_id: stylebertvits2ModelId,
       style: stylebertvits2Style,
       sdp_ratio: stylebertvits2SdpRatio,
       length: stylebertvits2Length,
       language: selectLanguage,
-      auto_split: false,
+      auto_split: autoSplit,
+    }
+    if (splitInterval !== undefined) {
+      postBody.split_interval = splitInterval
     }
 
     const voiceEndpoint = `${stylebertvits2ServerUrl}/voice`

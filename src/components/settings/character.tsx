@@ -1203,11 +1203,31 @@ const Character = () => {
                 {live2dModels.length === 0 && (
                   <option value="">{t('Live2D.NoModels')}</option>
                 )}
-                {live2dModels.map((model) => (
-                  <option key={model.path} value={model.path}>
-                    {model.name}
-                  </option>
-                ))}
+                {live2dModels.map((model) => {
+                  const incompatible = model.mocVersion === 5
+                  const versionLabel =
+                    model.mocVersion === 5
+                      ? ' [Cubism5 非対応]'
+                      : model.mocVersion === 4
+                        ? ' [Cubism4.2]'
+                        : model.mocVersion === 3
+                          ? ' [Cubism4.0]'
+                          : model.mocVersion === 2
+                            ? ' [Cubism3.3]'
+                            : model.mocVersion === 1
+                              ? ' [Cubism3.0]'
+                              : ''
+                  return (
+                    <option
+                      key={model.path}
+                      value={model.path}
+                      disabled={incompatible}
+                    >
+                      {model.name}
+                      {versionLabel}
+                    </option>
+                  )
+                })}
               </select>
               <TextButton
                 onClick={refreshLive2DList}

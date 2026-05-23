@@ -54,6 +54,8 @@ export interface Live2DModelInfo {
   name: string
   expressions: string[]
   motions: string[]
+  /** moc3 version byte: 1=Cubism3.0, 2=Cubism3.3, 3=Cubism4.0, 4=Cubism4.2, 5=Cubism5.0 */
+  mocVersion?: number
 }
 
 function buildModelUrlPath(
@@ -94,6 +96,8 @@ export async function discoverLive2DModelsInRoot(
 
     let expressions: string[] = []
     let motions: string[] = []
+    let mocVersion: number | undefined
+
     try {
       const modelContent = await fs.readFile(fullModelPath, 'utf-8')
       const modelJson = JSON.parse(modelContent)
@@ -102,6 +106,24 @@ export async function discoverLive2DModelsInRoot(
           (exp: { Name: string }) => exp.Name
         ) || []
       motions = Object.keys(modelJson.FileReferences?.Motions || {})
+
+      const mocRelPath = modelJson.FileReferences?.Moc
+      if (mocRelPath) {
+        const mocFullPath = path.join(
+          folderPath,
+          location.relativeDir,
+          mocRelPath
+        )
+        try {
+          const mocBuf = await fs.readFile(mocFullPath)
+          // 5th byte (index 4) encodes moc version: 1=Cubism3.0, 2=Cubism3.3, 3=Cubism4.0, 4=Cubism4.2, 5=Cubism5.0
+          if (mocBuf.length > 4 && mocBuf.slice(0, 4).toString('ascii') === 'MOC3') {
+            mocVersion = mocBuf[4]
+          }
+        } catch {
+          // moc3 読み取り失敗は無視
+        }
+      }
     } catch {
       // model3.json が壊れていても一覧には載せる
     }
@@ -111,6 +133,7 @@ export async function discoverLive2DModelsInRoot(
       name: folder.name,
       expressions,
       motions,
+      mocVersion,
     })
   }
 

@@ -18,6 +18,7 @@ import { testVoice } from '@/features/messages/speakCharacter'
 import settingsStore from '@/features/stores/settings'
 import { Link } from '../link'
 import { TextButton } from '../textButton'
+import { ToggleSwitch } from '../toggleSwitch'
 import speakers from '../speakers.json'
 // import speakers_aivis from '../speakers_aivis.json'
 import { useRestrictedMode } from '@/hooks/useRestrictedMode'
@@ -87,6 +88,14 @@ const Voice = () => {
   const stylebertvits2Style = settingsStore((s) => s.stylebertvits2Style)
   const stylebertvits2SdpRatio = settingsStore((s) => s.stylebertvits2SdpRatio)
   const stylebertvits2Length = settingsStore((s) => s.stylebertvits2Length)
+  const irodoriTtsServerUrl = settingsStore((s) => s.irodoriTtsServerUrl)
+  const irodoriTtsApiKey = settingsStore((s) => s.irodoriTtsApiKey)
+  const irodoriTtsVoice = settingsStore((s) => s.irodoriTtsVoice)
+  const irodoriTtsModel = settingsStore((s) => s.irodoriTtsModel)
+  const irodoriTtsSpeed = settingsStore((s) => s.irodoriTtsSpeed)
+  const irodoriTtsInjectEmotion = settingsStore(
+    (s) => s.irodoriTtsInjectEmotion
+  )
   const gsviTtsServerUrl = settingsStore((s) => s.gsviTtsServerUrl)
   const gsviTtsModelId = settingsStore((s) => s.gsviTtsModelId)
   const gsviTtsBatchSize = settingsStore((s) => s.gsviTtsBatchSize)
@@ -112,6 +121,35 @@ const Voice = () => {
     }>
   >([])
   const [sbv2ModelsLoading, setSbv2ModelsLoading] = useState(false)
+  const [irodoriVoices, setIrodoriVoices] = useState<Array<{ id: string }>>([])
+  const [irodoriVoicesLoading, setIrodoriVoicesLoading] = useState(false)
+
+  const fetchIrodoriVoices = useCallback(async () => {
+    const url = settingsStore.getState().irodoriTtsServerUrl.trim()
+    if (!url) return
+
+    setIrodoriVoicesLoading(true)
+    try {
+      const res = await fetch(
+        `/api/irodori-tts-voices?serverUrl=${encodeURIComponent(url)}`
+      )
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to load voices')
+      }
+      setIrodoriVoices(Array.isArray(data) ? data : [])
+
+      const currentVoice = settingsStore.getState().irodoriTtsVoice
+      if (!currentVoice && data?.[0]?.id) {
+        settingsStore.setState({ irodoriTtsVoice: data[0].id })
+      }
+    } catch (error) {
+      console.error('Failed to fetch Irodori-TTS voices:', error)
+      setIrodoriVoices([])
+    } finally {
+      setIrodoriVoicesLoading(false)
+    }
+  }, [])
 
   const fetchSbv2Models = useCallback(async () => {
     const url = settingsStore.getState().stylebertvits2ServerUrl.trim()
@@ -162,6 +200,23 @@ const Voice = () => {
       setSbv2ModelsLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    if (
+      selectVoice === 'irodoritts' &&
+      irodoriTtsServerUrl.trim() &&
+      irodoriVoices.length === 0 &&
+      !irodoriVoicesLoading
+    ) {
+      fetchIrodoriVoices()
+    }
+  }, [
+    selectVoice,
+    irodoriTtsServerUrl,
+    irodoriVoices.length,
+    irodoriVoicesLoading,
+    fetchIrodoriVoices,
+  ])
 
   useEffect(() => {
     if (
@@ -262,6 +317,7 @@ const Voice = () => {
           <option value="koeiromap">{t('UsingKoeiromap')}</option>
           <option value="google">{t('UsingGoogleTTS')}</option>
           <option value="stylebertvits2">{t('UsingStyleBertVITS2')}</option>
+          <option value="irodoritts">{t('UsingIrodoriTTS')}</option>
           <option value="aivis_speech">{t('UsingAivisSpeech')}</option>
           <option value="aivis_cloud_api">{t('UsingAivisCloudAPI')}</option>
           <option value="gsvitts">{t('UsingGSVITTS')}</option>
@@ -602,6 +658,9 @@ const Voice = () => {
                   <br />
                   <br />
                 </div>
+                <p className="my-1 text-xs text-gray-600 whitespace-pre-wrap">
+                  {t('StyleBeatVITS2TtsSplitHint')}
+                </p>
                 <div className="mt-4 font-bold">
                   {t('StyleBeatVITS2ServerURL')}
                 </div>
@@ -743,6 +802,9 @@ const Voice = () => {
                 <div className="mt-4 font-bold">
                   {t('StyleBeatVITS2SdpRatio')}: {stylebertvits2SdpRatio}
                 </div>
+                <p className="mt-1 text-xs text-gray-600">
+                  {t('StyleBeatVITS2SdpRatioHint')}
+                </p>
                 <input
                   type="range"
                   min={0.0}
@@ -772,6 +834,139 @@ const Voice = () => {
                     })
                   }}
                 ></input>
+              </>
+            )
+          } else if (selectVoice === 'irodoritts') {
+            return (
+              <>
+                <div className="my-2 text-sm whitespace-pre-wrap">
+                  {t('IrodoriTTSInfo')}
+                  <br />
+                  <Link
+                    url="https://github.com/Aratako/Irodori-TTS-Server"
+                    label="https://github.com/Aratako/Irodori-TTS-Server"
+                  />
+                </div>
+                <p className="my-1 text-xs text-gray-600 whitespace-pre-wrap">
+                  {t('IrodoriTTSServerHint')}
+                </p>
+                <div className="mt-4 font-bold">
+                  {t('IrodoriTTSServerURL')}
+                </div>
+                <div className="mt-2">
+                  <input
+                    className="text-ellipsis px-4 py-2 w-full bg-white hover:bg-white-hover rounded-lg"
+                    type="text"
+                    placeholder={t('IrodoriTTSServerURLPlaceholder')}
+                    value={irodoriTtsServerUrl}
+                    onChange={(e) =>
+                      settingsStore.setState({
+                        irodoriTtsServerUrl: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="mt-3">
+                  <TextButton
+                    onClick={fetchIrodoriVoices}
+                    disabled={
+                      !irodoriTtsServerUrl.trim() || irodoriVoicesLoading
+                    }
+                  >
+                    {irodoriVoicesLoading
+                      ? '...'
+                      : t('IrodoriTTSRefreshVoices')}
+                  </TextButton>
+                  {irodoriVoices.length > 0 && (
+                    <span className="ml-3 text-sm text-gray-600">
+                      {t('IrodoriTTSVoicesLoaded', {
+                        count: irodoriVoices.length,
+                      })}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-4 font-bold">{t('IrodoriTTSApiKey')}</div>
+                <div className="mt-2">
+                  <input
+                    className="text-ellipsis px-4 py-2 w-full bg-white hover:bg-white-hover rounded-lg"
+                    type="text"
+                    placeholder="（ローカルは空で可）"
+                    value={irodoriTtsApiKey}
+                    onChange={(e) =>
+                      settingsStore.setState({
+                        irodoriTtsApiKey: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="mt-4 font-bold">{t('IrodoriTTSVoice')}</div>
+                {irodoriVoices.length > 0 ? (
+                  <select
+                    className="mt-2 px-4 py-2 w-full bg-white hover:bg-white-hover rounded-lg"
+                    value={irodoriTtsVoice}
+                    onChange={(e) =>
+                      settingsStore.setState({
+                        irodoriTtsVoice: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">{t('Select')}</option>
+                    {irodoriVoices.map((voice) => (
+                      <option key={voice.id} value={voice.id}>
+                        {voice.id}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    className="mt-2 text-ellipsis px-4 py-2 w-full bg-white hover:bg-white-hover rounded-lg"
+                    type="text"
+                    placeholder="sample"
+                    value={irodoriTtsVoice}
+                    onChange={(e) =>
+                      settingsStore.setState({
+                        irodoriTtsVoice: e.target.value,
+                      })
+                    }
+                  />
+                )}
+                <div className="mt-4 font-bold">{t('IrodoriTTSModel')}</div>
+                <input
+                  className="mt-2 text-ellipsis px-4 py-2 w-full bg-white hover:bg-white-hover rounded-lg"
+                  type="text"
+                  value={irodoriTtsModel}
+                  onChange={(e) =>
+                    settingsStore.setState({
+                      irodoriTtsModel: e.target.value,
+                    })
+                  }
+                />
+                <div className="mt-4 font-bold">
+                  {t('IrodoriTTSSpeed')}: {irodoriTtsSpeed}
+                </div>
+                <input
+                  type="range"
+                  min={0.25}
+                  max={4.0}
+                  step={0.05}
+                  value={irodoriTtsSpeed}
+                  className="mt-2 mb-4 input-range"
+                  onChange={(e) =>
+                    settingsStore.setState({
+                      irodoriTtsSpeed: Number(e.target.value),
+                    })
+                  }
+                />
+                <div className="mt-4 font-bold">{t('IrodoriTTSInjectEmotion')}</div>
+                <ToggleSwitch
+                  enabled={irodoriTtsInjectEmotion}
+                  onChange={(v) =>
+                    settingsStore.setState({ irodoriTtsInjectEmotion: v })
+                  }
+                />
+                <p className="mt-2 text-xs text-gray-600 whitespace-pre-wrap">
+                  {t('IrodoriTTSInjectEmotionHint')}
+                </p>
               </>
             )
           } else if (selectVoice === 'aivis_speech') {

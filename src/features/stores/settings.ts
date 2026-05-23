@@ -124,6 +124,12 @@ interface ModelProvider extends Live2DSettings {
   stylebertvits2Style: string
   stylebertvits2SdpRatio: number
   stylebertvits2Length: number
+  irodoriTtsServerUrl: string
+  irodoriTtsApiKey: string
+  irodoriTtsVoice: string
+  irodoriTtsModel: string
+  irodoriTtsSpeed: number
+  irodoriTtsInjectEmotion: boolean
   gsviTtsServerUrl: string
   gsviTtsModelId: string
   gsviTtsBatchSize: number
@@ -252,6 +258,10 @@ interface General {
   speechRecognitionMode: SpeechRecognitionMode
   whisperTranscriptionModel: WhisperTranscriptionModel
   deepgramApiKey: string
+  deepgramAutoSend: boolean
+  deepgramEndpointingMs: number
+  deepgramModel: string
+  deepgramSilenceHoldMs: number
   initialSpeechTimeout: number
   chatLogWidth: number
   imageDisplayPosition: 'input' | 'side' | 'icon'
@@ -270,6 +280,12 @@ interface General {
   coStreamerName: string
   // Phase 6.8: 背景演出
   backgroundChangeEnabled: boolean
+  // BGM（ループ再生）
+  bgmEnabled: boolean
+  bgmPath: string
+  bgmVolume: number
+  bgmDuckOnSpeech: boolean
+  bgmDuckVolume: number
 }
 
 interface ModelType {
@@ -412,6 +428,16 @@ const getInitialValuesFromEnv = (): SettingsState => ({
     0.35,
   stylebertvits2Length:
     parseFloat(process.env.NEXT_PUBLIC_STYLEBERTVITS2_LENGTH || '1.0') || 1.0,
+  irodoriTtsServerUrl:
+    process.env.NEXT_PUBLIC_IRODORI_TTS_SERVER_URL || '',
+  irodoriTtsApiKey: '',
+  irodoriTtsVoice: process.env.NEXT_PUBLIC_IRODORI_TTS_VOICE || '',
+  irodoriTtsModel:
+    process.env.NEXT_PUBLIC_IRODORI_TTS_MODEL || 'irodori-tts',
+  irodoriTtsSpeed:
+    parseFloat(process.env.NEXT_PUBLIC_IRODORI_TTS_SPEED || '1.0') || 1.0,
+  irodoriTtsInjectEmotion:
+    process.env.NEXT_PUBLIC_IRODORI_TTS_INJECT_EMOTION !== 'false',
   gsviTtsServerUrl:
     process.env.NEXT_PUBLIC_GSVI_TTS_URL || 'http://127.0.0.1:5000/tts',
   gsviTtsModelId: process.env.NEXT_PUBLIC_GSVI_TTS_MODEL_ID || '0',
@@ -608,6 +634,14 @@ const getInitialValuesFromEnv = (): SettingsState => ({
       .NEXT_PUBLIC_WHISPER_TRANSCRIPTION_MODEL as WhisperTranscriptionModel) ||
     'whisper-1',
   deepgramApiKey: process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY || '',
+  deepgramAutoSend: process.env.NEXT_PUBLIC_DEEPGRAM_AUTO_SEND !== 'false',
+  deepgramEndpointingMs:
+    parseInt(process.env.NEXT_PUBLIC_DEEPGRAM_ENDPOINTING_MS || '300', 10) ||
+    300,
+  deepgramModel: process.env.NEXT_PUBLIC_DEEPGRAM_MODEL || 'nova-2',
+  deepgramSilenceHoldMs:
+    parseInt(process.env.NEXT_PUBLIC_DEEPGRAM_SILENCE_HOLD_MS || '1500', 10) ||
+    1500,
   initialSpeechTimeout:
     parseFloat(process.env.NEXT_PUBLIC_INITIAL_SPEECH_TIMEOUT || '5.0') || 5.0,
   chatLogWidth:
@@ -650,6 +684,14 @@ const getInitialValuesFromEnv = (): SettingsState => ({
     process.env.NEXT_PUBLIC_CO_STREAMING_MODE === 'true' || false,
   coStreamerName: process.env.NEXT_PUBLIC_CO_STREAMER_NAME || '',
   backgroundChangeEnabled: false,
+
+  bgmEnabled: process.env.NEXT_PUBLIC_BGM_ENABLED === 'true',
+  bgmPath: process.env.NEXT_PUBLIC_BGM_PATH || '',
+  bgmVolume:
+    parseFloat(process.env.NEXT_PUBLIC_BGM_VOLUME || '0.35') || 0.35,
+  bgmDuckOnSpeech: process.env.NEXT_PUBLIC_BGM_DUCK_ON_SPEECH !== 'false',
+  bgmDuckVolume:
+    parseFloat(process.env.NEXT_PUBLIC_BGM_DUCK_VOLUME || '0.12') || 0.12,
 
   // Settings
   modelType:
@@ -962,6 +1004,12 @@ const settingsStore = create<SettingsState>()(
         stylebertvits2Style: state.stylebertvits2Style,
         stylebertvits2SdpRatio: state.stylebertvits2SdpRatio,
         stylebertvits2Length: state.stylebertvits2Length,
+        irodoriTtsServerUrl: state.irodoriTtsServerUrl,
+        irodoriTtsApiKey: state.irodoriTtsApiKey,
+        irodoriTtsVoice: state.irodoriTtsVoice,
+        irodoriTtsModel: state.irodoriTtsModel,
+        irodoriTtsSpeed: state.irodoriTtsSpeed,
+        irodoriTtsInjectEmotion: state.irodoriTtsInjectEmotion,
         gsviTtsServerUrl: state.gsviTtsServerUrl,
         gsviTtsModelId: state.gsviTtsModelId,
         gsviTtsBatchSize: state.gsviTtsBatchSize,
@@ -1071,6 +1119,10 @@ const settingsStore = create<SettingsState>()(
         speechRecognitionMode: state.speechRecognitionMode,
         whisperTranscriptionModel: state.whisperTranscriptionModel,
         deepgramApiKey: state.deepgramApiKey,
+        deepgramAutoSend: state.deepgramAutoSend,
+        deepgramEndpointingMs: state.deepgramEndpointingMs,
+        deepgramModel: state.deepgramModel,
+        deepgramSilenceHoldMs: state.deepgramSilenceHoldMs,
         customApiUrl: state.customApiUrl,
         customApiHeaders: state.customApiHeaders,
         customApiBody: state.customApiBody,
@@ -1093,6 +1145,11 @@ const settingsStore = create<SettingsState>()(
         coStreamingMode: state.coStreamingMode,
         coStreamerName: state.coStreamerName,
         backgroundChangeEnabled: state.backgroundChangeEnabled,
+        bgmEnabled: state.bgmEnabled,
+        bgmPath: state.bgmPath,
+        bgmVolume: state.bgmVolume,
+        bgmDuckOnSpeech: state.bgmDuckOnSpeech,
+        bgmDuckVolume: state.bgmDuckVolume,
         memoryEnabled: state.memoryEnabled,
         memorySimilarityThreshold: state.memorySimilarityThreshold,
         memorySearchLimit: state.memorySearchLimit,

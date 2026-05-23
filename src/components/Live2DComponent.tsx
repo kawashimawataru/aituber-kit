@@ -142,16 +142,10 @@ const Live2DComponent = (): JSX.Element => {
     }
 
     try {
-      const newModel = await Live2DModel.fromSync(modelPath, {
+      const newModel = await Live2DModel.from(modelPath, {
         ticker: Ticker.shared,
         autoHitTest: false,
         autoFocus: false,
-      })
-
-      await new Promise((resolve, reject) => {
-        newModel.once('load', () => resolve(true))
-        newModel.once('error', (e) => reject(e))
-        setTimeout(() => reject(new Error('Model load timeout')), 10000)
       })
 
       currentApp.stage.addChild(newModel as unknown as DisplayObject)
@@ -166,11 +160,12 @@ const Live2DComponent = (): JSX.Element => {
 
       await Live2DHandler.resetToIdle()
     } catch (error) {
-      console.error('Failed to load Live2D model:', error)
+      console.error('[Live2D] Failed to load model:', modelPath, error)
       homeStore.setState({ live2dViewer: null })
+      const msg =
+        error instanceof Error ? error.message : String(error)
       toastStore.getState().addToast({
-        message:
-          'Live2Dモデルの読み込みに失敗しました。設定で別モデルを選ぶか、model3.json とテクスチャのパスを確認してください。',
+        message: `Live2Dモデルの読み込みに失敗しました: ${msg}`,
         type: 'error',
         tag: 'live2d-model-load',
       })

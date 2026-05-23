@@ -29,6 +29,30 @@ const Based = () => {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const backgroundImageUrl = homeStore((s) => s.backgroundImageUrl)
+  const bgmEnabled = settingsStore((s) => s.bgmEnabled)
+  const bgmPath = settingsStore((s) => s.bgmPath)
+  const bgmVolume = settingsStore((s) => s.bgmVolume)
+  const bgmDuckOnSpeech = settingsStore((s) => s.bgmDuckOnSpeech)
+  const bgmDuckVolume = settingsStore((s) => s.bgmDuckVolume)
+  const [bgmFiles, setBgmFiles] = useState<string[]>([])
+  const [bgmLoading, setBgmLoading] = useState(false)
+  const [bgmError, setBgmError] = useState<string | null>(null)
+  const [bgmUploading, setBgmUploading] = useState(false)
+  const [bgmUploadError, setBgmUploadError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setBgmLoading(true)
+    setBgmError(null)
+    fetch('/api/get-bgm-list')
+      .then((res) => res.json())
+      .then((files) => {
+        if (Array.isArray(files)) {
+          setBgmFiles(files)
+        }
+      })
+      .catch(() => setBgmError(t('BgmListFetchError')))
+      .finally(() => setBgmLoading(false))
+  }, [t])
 
   useEffect(() => {
     setIsLoading(true)
@@ -93,6 +117,49 @@ const Based = () => {
     } finally {
       setIsUploading(false)
       setIsLoading(false)
+    }
+  }
+
+  const handleBgmUpload = async (file: File) => {
+    if (
+      !file.type.startsWith('audio/') &&
+      !file.name.match(/\.(mp3|wav|ogg|m4a|aac|flac)$/i)
+    ) {
+      setBgmUploadError(t('BgmInvalidFileType'))
+      return
+    }
+
+    if (file.size > 50 * 1024 * 1024) {
+      setBgmUploadError(t('FileSizeLimitExceeded'))
+      return
+    }
+
+    setBgmUploading(true)
+    setBgmUploadError(null)
+    const formData = new FormData()
+    formData.append('file', file)
+
+    try {
+      const response = await fetch('/api/upload-bgm', {
+        method: 'POST',
+        body: formData,
+      })
+      if (!response.ok) {
+        throw new Error(t('UploadFailed'))
+      }
+      const { path } = await response.json()
+      settingsStore.setState({ bgmPath: path, bgmEnabled: true })
+
+      const listResponse = await fetch('/api/get-bgm-list')
+      const files = await listResponse.json()
+      if (Array.isArray(files)) {
+        setBgmFiles(files)
+      }
+    } catch (error) {
+      console.error('Error uploading BGM:', error)
+      setBgmUploadError(t('BgmUploadError'))
+    } finally {
+      setBgmUploading(false)
     }
   }
 
@@ -218,6 +285,109 @@ const Based = () => {
             {isUploading ? t('Uploading') : t('UploadBackground')}
           </TextButton>
         </div>
+      </div>
+
+      <div className="border-t border-gray-300 pt-6 my-6">
+        <div className="my-4 text-xl font-bold">{t('BgmSettings')}</div>
+        <div className="my-2 text-sm whitespace-pre-wrap">
+          {t('BgmSettingsDescription')}
+        </div>
+
+        <div className="my-4 font-bold">{t('BgmEnabled')}</div>
+        <ToggleSwitch
+          enabled={bgmEnabled}
+          onChange={(v) => settingsStore.setState({ bgmEnabled: v })}
+        />
+
+        {bgmLoading && <div className="my-2">{t('Loading')}</div>}
+        {bgmError && <div className="my-2 text-red-500">{bgmError}</div>}
+        {bgmUploadError && (
+          <div className="my-2 text-red-500">{bgmUploadError}</div>
+        )}
+
+        <div className="my-4 font-bold">{t('BgmSelect')}</div>
+        <select
+          className="text-ellipsis px-4 py-2 w-full bg-white hover:bg-white-hover rounded-lg"
+          value={bgmPath}
+          onChange={(e) =>
+            settingsStore.setState({
+              bgmPath: e.target.value,
+              bgmEnabled: e.target.value ? true : bgmEnabled,
+            })
+          }
+          disabled={bgmLoading || bgmUploading || isRestrictedMode}
+        >
+          <option value="">{t('BgmNone')}</option>
+          {bgmFiles.map((file) => (
+            <option key={file} value={`/bgm/${file}`}>
+              {file}
+            </option>
+          ))}
+        </select>
+
+        <div className="my-4">
+          <TextButton
+            onClick={() => {
+              const { fileInput } = menuStore.getState()
+              if (fileInput) {
+                fileInput.accept = 'audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac'
+                fileInput.onchange = (e) => {
+                  const file = (e.target as HTMLInputElement).files?.[0]
+                  if (file) {
+                    handleBgmUpload(file)
+                  }
+                }
+                fileInput.click()
+              }
+            }}
+            disabled={bgmLoading || bgmUploading || isRestrictedMode}
+          >
+            {bgmUploading ? t('Uploading') : t('BgmUpload')}
+          </TextButton>
+        </div>
+
+        <div className="my-4 font-bold">
+          {t('BgmVolume')}: {Math.round(bgmVolume * 100)}%
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={bgmVolume}
+          className="w-full input-range"
+          onChange={(e) =>
+            settingsStore.setState({ bgmVolume: Number(e.target.value) })
+          }
+        />
+
+        <div className="my-4 font-bold">{t('BgmDuckOnSpeech')}</div>
+        <ToggleSwitch
+          enabled={bgmDuckOnSpeech}
+          onChange={(v) => settingsStore.setState({ bgmDuckOnSpeech: v })}
+        />
+
+        {bgmDuckOnSpeech && (
+          <>
+            <div className="my-4 font-bold">
+              {t('BgmDuckVolume')}: {Math.round(bgmDuckVolume * 100)}%
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={bgmDuckVolume}
+              className="w-full input-range"
+              onChange={(e) =>
+                settingsStore.setState({
+                  bgmDuckVolume: Number(e.target.value),
+                })
+              }
+            />
+          </>
+        )}
+        <p className="mt-2 text-xs text-gray-600">{t('BgmAutoplayHint')}</p>
       </div>
 
       {/* アシスタントテキスト表示設定 */}

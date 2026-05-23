@@ -1,0 +1,49 @@
+import { Talk } from './messages'
+import { applyIrodoriEmotionToText } from '@/utils/irodoriTtsEmotion'
+
+export async function synthesizeVoiceIrodoriTtsApi(
+  talk: Talk,
+  irodoriTtsServerUrl: string,
+  irodoriTtsApiKey: string,
+  irodoriTtsVoice: string,
+  irodoriTtsModel: string,
+  irodoriTtsSpeed: number,
+  irodoriTtsInjectEmotion: boolean
+) {
+  const input = applyIrodoriEmotionToText(
+    talk.message,
+    talk.emotion,
+    irodoriTtsInjectEmotion
+  )
+
+  try {
+    const res = await fetch('/api/irodori-tts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: input,
+        irodoriTtsServerUrl,
+        irodoriTtsApiKey,
+        irodoriTtsVoice,
+        irodoriTtsModel,
+        irodoriTtsSpeed,
+      }),
+    })
+
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '')
+      throw new Error(
+        `Irodori-TTS APIからの応答が異常です。ステータスコード: ${res.status}${errBody ? ` — ${errBody.slice(0, 200)}` : ''}`
+      )
+    }
+
+    return await res.arrayBuffer()
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Irodori-TTSでエラーが発生しました: ${error.message}`)
+    }
+    throw new Error('Irodori-TTSで不明なエラーが発生しました')
+  }
+}

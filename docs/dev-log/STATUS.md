@@ -1,7 +1,7 @@
 # 開発ステータス（常に最新）
 
 > エージェントは作業の **開始時・終了時** に必ず更新する。  
-> 最終更新: **2026-05-23**
+> 最終更新: **2026-05-23 (Live2D multi-model)**
 
 ---
 
@@ -23,6 +23,9 @@
 
 | ID | 内容 | 完了日 |
 |----|------|--------|
+| Live2D-compat | `discoverModel.ts` — `mocVersion` フィールド追加（moc3 5th byte 読み取り）+ UI で Cubism5 をグレーアウト | 2026-05-23 |
+| Live2D-err | `Live2DComponent.tsx` — `fromSync`→`from()` 切替で即時エラー伝播（10s タイムアウト排除）+ エラーメッセージ改善 | 2026-05-23 |
+| Live2D-sync | `live2dEmotionSync.ts` — 表情なしモデル切替時に設定リセット（stale 設定を防止） | 2026-05-23 |
 | 5-1 | `coStreamingPresets.tsx` — 3プリセットボタン（A/B/C）でシステムプロンプト即時反映 | 2026-05-23 |
 | 6.8-4 | `emotionBg.ts` — 感情タグ→背景切替（catalog.json キャッシュ付き）+ `coStreamingSettings.tsx` に UI | 2026-05-23 |
 | 6-11 | `stuntScheduler.ts` — stunt 発火後に cooldownMs×0.7 ms で `resetToIdle()` 自動実行 | 2026-05-23 |
@@ -69,10 +72,10 @@
 
 ## 次にやること（優先順）
 
-1. **SE 差し替え** `public/assets/reactions/` の無音プレースホルダーを実音源に差し替え
-2. **stunt ポーズ調整** `[stunt:lean_in]` 等を実機で確認し、値を微調整（VRM エディタ推奨）
-3. **実機 E2E** `docs/project/e2e-youtube-checklist.md` のチェックリストを全項目確認
-4. **Phase 5-3/4** OBS 構成ガイド + わんコメ運用ドキュメント整備
+1. **Live2D Cubism3.x 動作確認** — `from()` 切替後に akari_vts / hiyori_vts 等のトースト内エラーメッセージを確認。"Failed to CubismMoc.create()" なら Core4 で Cubism3.x moc が非対応の可能性（Core3 系 SDK の導入か、Cubism4 対応モデルへの変換を検討）
+2. **SE 差し替え** `public/assets/reactions/` の無音プレースホルダーを実音源に差し替え
+3. **stunt ポーズ調整** `[stunt:lean_in]` 等を実機で確認し、値を微調整（VRM エディタ推奨）
+4. **実機 E2E** `docs/project/e2e-youtube-checklist.md` のチェックリストを全項目確認
 5. **Phase 4.5-4** TTS パイプライン並列化（文N生成と文N-1再生のオーバーラップ）
 6. **Irodori-TTS 移行**（将来）— [irodori-tts-migration.md](../project/irodori-tts-migration.md)。ローカル本体: `/Users/kawashimawataru/Desktop/Fuva_file/Irodori-TTS`
 

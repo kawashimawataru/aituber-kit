@@ -17,7 +17,22 @@ export function syncLive2DEmotionsFromModel(model: {
   expressions: string[]
   motions: string[]
 }): void {
-  if (!model.expressions?.length) return
+  if (!model.expressions?.length) {
+    // No expressions — reset to avoid stale settings from a previously loaded model
+    const idleMotion =
+      model.motions?.find((m) => m === 'Idle') || model.motions?.[0] || 'Idle'
+    settingsStore.setState({
+      idleMotionGroup: idleMotion,
+      neutralMotionGroup: idleMotion,
+      neutralEmotions: [],
+      happyEmotions: [],
+      sadEmotions: [],
+      angryEmotions: [],
+      relaxedEmotions: [],
+      surprisedEmotions: [],
+    })
+    return
+  }
 
   const available = new Set(model.expressions)
   const updates: Record<string, string[] | string> = {}

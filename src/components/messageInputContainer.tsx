@@ -1,10 +1,9 @@
-import { useEffect } from 'react'
+import { useCallback } from 'react'
 import { MessageInput } from '@/components/messageInput'
 import homeStore from '@/features/stores/home'
 import settingsStore from '@/features/stores/settings'
 import { useVoiceRecognition } from '@/hooks/useVoiceRecognition'
 
-// 無音検出用の状態と変数を追加
 type Props = {
   onChatProcessStart: (text: string) => void
 }
@@ -15,8 +14,10 @@ export const MessageInputContainer = ({ onChatProcessStart }: Props) => {
     (s) => s.continuousMicListeningMode
   )
   const speechRecognitionMode = settingsStore((s) => s.speechRecognitionMode)
+  const deepgramAutoSend = settingsStore((s) => s.deepgramAutoSend)
+  const realtimeAPIMode = settingsStore((s) => s.realtimeAPIMode)
+  const audioMode = settingsStore((s) => s.audioMode)
 
-  // 音声認識フックを使用
   const {
     userMessage,
     isListening,
@@ -29,16 +30,39 @@ export const MessageInputContainer = ({ onChatProcessStart }: Props) => {
     stopListening,
   } = useVoiceRecognition({ onChatProcessStart })
 
-  // 常時マイク入力モードの切り替え
-  const toggleContinuousMode = () => {
-    // Whisperモードの場合は常時マイク入力モードを使用できない
-    if (speechRecognitionMode === 'whisper') return
+  const handleContinuousMicChange = useCallback(
+    async (enabled: boolean) => {
+      if (speechRecognitionMode === 'whisper') return
 
-    // 現在のモードを反転して設定
-    settingsStore.setState({
-      continuousMicListeningMode: !continuousMicListeningMode,
-    })
-  }
+      settingsStore.setState({ continuousMicListeningMode: enabled })
+
+      if (!enabled && isListening) {
+        await stopListening()
+        return
+      }
+
+      const hs = homeStore.getState()
+      if (
+        enabled &&
+        !isListening &&
+        !hs.isSpeaking &&
+        !hs.chatProcessing
+      ) {
+        await startListening()
+      }
+    },
+    [speechRecognitionMode, isListening, stopListening, startListening]
+  )
+
+  const handleDeepgramAutoSendChange = useCallback((enabled: boolean) => {
+    settingsStore.setState({ deepgramAutoSend: enabled })
+  }, [])
+
+  const showSpeechInputToggles =
+    !realtimeAPIMode &&
+    !audioMode &&
+    (speechRecognitionMode === 'browser' ||
+      speechRecognitionMode === 'deepgram')
 
   return (
     <MessageInput
@@ -51,9 +75,18 @@ export const MessageInputContainer = ({ onChatProcessStart }: Props) => {
       isSpeaking={isSpeaking}
       silenceTimeoutRemaining={silenceTimeoutRemaining}
       continuousMicListeningMode={
-        continuousMicListeningMode && speechRecognitionMode === 'browser'
+        continuousMicListeningMode &&
+        (speechRecognitionMode === 'browser' ||
+          speechRecognitionMode === 'deepgram')
       }
-      onToggleContinuousMode={toggleContinuousMode}
+      isDeepgramTranscribing={
+        speechRecognitionMode === 'deepgram' && isListening
+      }
+      showSpeechInputToggles={showSpeechInputToggles}
+      speechRecognitionMode={speechRecognitionMode}
+      deepgramAutoSend={deepgramAutoSend}
+      onContinuousMicChange={handleContinuousMicChange}
+      onDeepgramAutoSendChange={handleDeepgramAutoSendChange}
     />
   )
 }

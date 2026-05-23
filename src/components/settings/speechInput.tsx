@@ -18,6 +18,10 @@ const SpeechInput = () => {
   )
   const openaiKey = settingsStore((s) => s.openaiKey)
   const deepgramApiKey = settingsStore((s) => s.deepgramApiKey)
+  const deepgramAutoSend = settingsStore((s) => s.deepgramAutoSend)
+  const deepgramEndpointingMs = settingsStore((s) => s.deepgramEndpointingMs)
+  const deepgramSilenceHoldMs = settingsStore((s) => s.deepgramSilenceHoldMs)
+  const deepgramModel = settingsStore((s) => s.deepgramModel)
   const continuousMicListeningMode = settingsStore(
     (s) => s.continuousMicListeningMode
   )
@@ -172,6 +176,73 @@ const SpeechInput = () => {
                 settingsStore.setState({ continuousMicListeningMode: v })
               }
             />
+          </div>
+          <div className="my-6">
+            <div className="my-4 text-xl font-bold">{t('DeepgramAutoSend')}</div>
+            <div className="my-2 text-sm whitespace-pre-wrap">
+              {t('DeepgramAutoSendInfo')}
+            </div>
+            <ToggleSwitch
+              enabled={deepgramAutoSend}
+              onChange={(v) =>
+                settingsStore.setState({ deepgramAutoSend: v })
+              }
+            />
+          </div>
+          <div className="my-6">
+            <div className="my-4 text-xl font-bold">
+              {t('DeepgramEndpointing')}: {deepgramEndpointingMs}ms
+            </div>
+            <div className="my-2 text-sm whitespace-pre-wrap">
+              {t('DeepgramEndpointingInfo')}
+            </div>
+            <input
+              type="range"
+              min={100}
+              max={2000}
+              step={50}
+              value={deepgramEndpointingMs}
+              className="w-full input-range"
+              onChange={(e) =>
+                settingsStore.setState({
+                  deepgramEndpointingMs: Number(e.target.value),
+                })
+              }
+            />
+          </div>
+          <div className="my-6">
+            <div className="my-4 text-xl font-bold">
+              {t('DeepgramSilenceHold')}: {deepgramSilenceHoldMs}ms
+            </div>
+            <div className="my-2 text-sm whitespace-pre-wrap">
+              {t('DeepgramSilenceHoldInfo')}
+            </div>
+            <input
+              type="range"
+              min={500}
+              max={3000}
+              step={100}
+              value={deepgramSilenceHoldMs}
+              className="w-full input-range"
+              onChange={(e) =>
+                settingsStore.setState({
+                  deepgramSilenceHoldMs: Number(e.target.value),
+                })
+              }
+            />
+          </div>
+          <div className="my-6">
+            <div className="my-4 text-xl font-bold">{t('DeepgramModel')}</div>
+            <select
+              className="px-4 py-2 bg-white hover:bg-white-hover rounded-lg"
+              value={deepgramModel}
+              onChange={(e) =>
+                settingsStore.setState({ deepgramModel: e.target.value })
+              }
+            >
+              <option value="nova-2">nova-2</option>
+              <option value="nova-3">nova-3</option>
+            </select>
           </div>
         </>
       )}

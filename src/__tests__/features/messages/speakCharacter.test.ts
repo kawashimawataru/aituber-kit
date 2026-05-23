@@ -150,6 +150,22 @@ describe('speakCharacter', () => {
       const text = 'こんにちは'
       expect(preprocessMessage(text, settingsStore.getState())).toBe(text)
     })
+
+    it('感情・モーション等の制御タグを除去する', () => {
+      const mockSettings = {
+        changeEnglishToJapanese: false,
+        selectLanguage: 'ja',
+        selectVoice: 'stylebertvits2',
+      }
+      ;(settingsStore.getState as jest.Mock).mockReturnValue(mockSettings)
+
+      expect(
+        preprocessMessage(
+          'ケツバトラー？[surprised][motion:shrug]えー、ごめん、知らないなー！[surprised]何それ？',
+          settingsStore.getState()
+        )
+      ).toBe('ケツバトラー？えー、ごめん、知らないなー！何それ？')
+    })
   })
 
   describe('handleTTSError', () => {

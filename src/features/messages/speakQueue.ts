@@ -3,6 +3,14 @@ import homeStore from '@/features/stores/home'
 import settingsStore from '@/features/stores/settings'
 import { Live2DHandler } from './live2dHandler'
 import { PNGTuberHandler } from '@/features/pngTuber/pngTuberHandler'
+import { wait } from '@/utils/wait'
+import {
+  INTER_SENTENCE_PAUSE_MS,
+  SBV2_INTER_SENTENCE_PAUSE_MS,
+  PrefetchSpeakPipeline,
+  usesPrefetchTts,
+} from './prefetchSpeakPipeline'
+import { sbv2SpeakBatcher } from './sbv2SpeakBatcher'
 
 type SpeakTask = {
   sessionId: string
@@ -21,6 +29,7 @@ export class SpeakQueue {
   private static _instance: SpeakQueue | null = null
   private stopped = false
   private static stopTokenCounter = 0
+  private lastPlaybackEndedAt = 0
 
   public static get currentStopToken() {
     return SpeakQueue.stopTokenCounter
@@ -58,6 +67,9 @@ export class SpeakQueue {
     instance.isProcessing = false
     SpeakQueue.stopTokenCounter++
     instance.clearQueue()
+    PrefetchSpeakPipeline.getInstance().clearAll()
+    sbv2SpeakBatcher.clear()
+    instance.lastPlaybackEndedAt = 0
     const hs = homeStore.getState()
     const ss = settingsStore.getState()
     if (ss.modelType === 'live2d') {
@@ -118,6 +130,21 @@ export class SpeakQueue {
           // 旧セッションのタスクは破棄
           continue
         }
+
+        const voice = settingsStore.getState().selectVoice
+        const interSentencePauseMs =
+          voice === 'stylebertvits2'
+            ? SBV2_INTER_SENTENCE_PAUSE_MS
+            : INTER_SENTENCE_PAUSE_MS
+
+        if (this.lastPlaybackEndedAt > 0 && usesPrefetchTts(voice)) {
+          const elapsed = Date.now() - this.lastPlaybackEndedAt
+          const remaining = interSentencePauseMs - elapsed
+          if (remaining > 0) {
+            await wait(remaining)
+          }
+        }
+
         try {
           const { audioBuffer, talk, isNeedDecode, onComplete } = task
           if (ss.modelType === 'live2d') {
@@ -137,6 +164,7 @@ export class SpeakQueue {
             console.error('Error details:', error.message)
           }
         }
+        this.lastPlaybackEndedAt = Date.now()
       }
     }
 

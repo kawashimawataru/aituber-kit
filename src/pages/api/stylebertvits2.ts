@@ -43,7 +43,10 @@ export default async function handler(
   }
 
   const body = req.body
-  const message = body.message
+  const message = String(body.message ?? '').trim()
+  if (!message) {
+    return res.status(400).json({ error: 'message is required' })
+  }
   const stylebertvits2ModelId = String(body.stylebertvits2ModelId ?? '0')
   const stylebertvits2ApiKey =
     body.stylebertvits2ApiKey || process.env.STYLEBERTVITS2_API_KEY
@@ -100,6 +103,7 @@ export default async function handler(
       sdp_ratio: String(stylebertvits2SdpRatio),
       length: String(stylebertvits2Length),
       language: selectLanguage,
+      auto_split: 'false',
     })
 
     const postBody = {
@@ -109,9 +113,13 @@ export default async function handler(
       sdp_ratio: stylebertvits2SdpRatio,
       length: stylebertvits2Length,
       language: selectLanguage,
+      auto_split: false,
     }
 
-    let voice = await fetch(`${stylebertvits2ServerUrl}/voice`, {
+    const voiceEndpoint = `${stylebertvits2ServerUrl}/voice`
+
+    // POST を優先（日本語テキストの安全・サーバー推奨）。失敗時のみ GET。
+    let voice = await fetch(voiceEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -120,10 +128,19 @@ export default async function handler(
       body: JSON.stringify(postBody),
     })
 
-    if (voice.status === 405 || voice.status === 404) {
-      const voiceUrl = `${stylebertvits2ServerUrl}/voice?${queryParams}`
-      voice = await fetch(voiceUrl, {
+    if (!voice.ok && (voice.status === 405 || voice.status === 404 || voice.status === 422)) {
+      const voiceUrlWithQuery = `${voiceEndpoint}?${queryParams}`
+      voice = await fetch(voiceUrlWithQuery, {
         method: 'GET',
+        headers: {
+          Accept: 'audio/wav',
+        },
+      })
+    }
+
+    if (!voice.ok && voice.status === 422) {
+      voice = await fetch(`${voiceEndpoint}?${queryParams}`, {
+        method: 'POST',
         headers: {
           Accept: 'audio/wav',
         },

@@ -1,10 +1,14 @@
 /**
- * TTS 送信用の文切り出し（Style-Bert-VITS2 向けにイントネーション重視）
+ * TTS 送信用の文切り出し
+ * Style-Bert-VITS2: 句点（。！？）単位でまとめ、読点では切らない
  */
 
 const MAJOR_SENTENCE_END = /[。．.!?！？\n]/
 const OPEN_QUOTE = /[「『（(\[]/g
 const CLOSE_QUOTE = /[」』）)\]]/g
+
+/** SBV2: 1リクエストにまとめる最大文字数（複数文の結合上限） */
+export const SBV2_MERGE_MAX_CHARS = 100
 
 function countMatches(text: string, re: RegExp): number {
   return (text.match(re) || []).length
@@ -34,7 +38,7 @@ export function isInvalidStandaloneTtsUnit(text: string): boolean {
 }
 
 /**
- * 従来の extractSentence（他エンジン・低遅延向け）
+ * 従来の extractSentence（他エンジン・Irodori 等・低遅延向け）
  */
 export function extractSentenceDefault(
   text: string
@@ -52,7 +56,9 @@ export function extractSentenceDefault(
 }
 
 /**
- * Style-Bert-VITS2 向け: 句点・終止符単位でまとめ、括弧の途中では切らない
+ * Style-Bert-VITS2 向け:
+ * - 読点（、）では切らない
+ * - 最初の句点（。！？）までを1塊（複数文は別 TTS + 再生間ポーズ）
  */
 export function extractSentenceStyleBertVits2(
   text: string
@@ -61,23 +67,22 @@ export function extractSentenceStyleBertVits2(
     return { sentence: '', remainingText: '' }
   }
 
-  let endIndex = -1
+  let firstSentenceEnd = -1
+
   for (let i = 0; i < text.length; i++) {
     const ch = text[i]
     if (!MAJOR_SENTENCE_END.test(ch)) continue
 
     const chunk = text.slice(0, i + 1)
-    if (hasUnclosedJapaneseQuote(chunk)) {
-      continue
-    }
+    if (hasUnclosedJapaneseQuote(chunk)) continue
 
-    endIndex = i
+    firstSentenceEnd = i
     break
   }
 
-  if (endIndex >= 0) {
-    const sentence = text.slice(0, endIndex + 1).trim()
-    const remainingText = text.slice(endIndex + 1).trimStart()
+  if (firstSentenceEnd >= 0) {
+    const sentence = text.slice(0, firstSentenceEnd + 1).trim()
+    const remainingText = text.slice(firstSentenceEnd + 1).trimStart()
 
     if (isInvalidStandaloneTtsUnit(sentence)) {
       return { sentence: '', remainingText: text }
@@ -86,18 +91,9 @@ export function extractSentenceStyleBertVits2(
     return { sentence, remainingText }
   }
 
-  // 非常に長いときだけ読点で分割（120文字超）
-  if (text.length > 120) {
-    const commaMatch = text.match(/^(.{40,}?[、,])/)
-    if (commaMatch?.[1] && !hasUnclosedJapaneseQuote(commaMatch[1])) {
-      const sentence = commaMatch[1].trim()
-      if (!isInvalidStandaloneTtsUnit(sentence)) {
-        return {
-          sentence,
-          remainingText: text.slice(commaMatch[1].length).trimStart(),
-        }
-      }
-    }
+  // 句点がまだ来ていない → ストリーム中はバッファ（読点だけでは送らない）
+  if (text.length <= SBV2_MERGE_MAX_CHARS) {
+    return { sentence: '', remainingText: text }
   }
 
   return { sentence: '', remainingText: text }

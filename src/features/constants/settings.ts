@@ -89,6 +89,7 @@ export type AIVoice =
   | 'google'
   | 'voicevox'
   | 'stylebertvits2'
+  | 'irodoritts'
   | 'aivis_speech'
   | 'aivis_cloud_api'
   | 'gsvitts'

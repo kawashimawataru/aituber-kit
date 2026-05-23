@@ -8,7 +8,7 @@ import {
 
 describe('ttsSentenceSplit', () => {
   describe('extractSentenceStyleBertVits2', () => {
-    it('句点までを1文として切り出す', () => {
+    it('最初の句点までを1文として切り出す', () => {
       expect(
         extractSentenceStyleBertVits2('こんにちは。元気ですか。')
       ).toEqual({
@@ -36,12 +36,29 @@ describe('ttsSentenceSplit', () => {
       expect(extractSentenceStyleBertVits2('」ね！').sentence).toBe('')
     })
 
-    it('読点では短い文を切らない', () => {
+    it('読点だけでは切らない（句点までバッファ）', () => {
       expect(
         extractSentenceStyleBertVits2('えーと、それは、')
       ).toEqual({
         sentence: '',
         remainingText: 'えーと、それは、',
+      })
+    })
+
+    it('複数文は最初の句点で区切る', () => {
+      const text =
+        '私はね、可愛いものと美味しいものに目がないんだ！よろしくね！'
+      expect(extractSentenceStyleBertVits2(text)).toEqual({
+        sentence: '私はね、可愛いものと美味しいものに目がないんだ！',
+        remainingText: 'よろしくね！',
+      })
+    })
+
+    it('読点では切らず句点まで1塊にする', () => {
+      const text = 'えっとね、楽しいことと可愛いものに夢中な私だよ！'
+      expect(extractSentenceStyleBertVits2(text)).toEqual({
+        sentence: 'えっとね、楽しいことと可愛いものに夢中な私だよ！',
+        remainingText: '',
       })
     })
   })

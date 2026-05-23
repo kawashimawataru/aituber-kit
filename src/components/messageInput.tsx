@@ -7,7 +7,9 @@ import settingsStore from '@/features/stores/settings'
 import slideStore from '@/features/stores/slide'
 import { isMultiModalAvailable } from '@/features/constants/aiModels'
 import { IconButton } from './iconButton'
+import { ToggleSwitch } from './toggleSwitch'
 import { useKioskMode } from '@/hooks/useKioskMode'
+import type { SpeechRecognitionMode } from '@/features/constants/settings'
 
 // ファイルバリデーションの設定
 const FILE_VALIDATION = {
@@ -25,6 +27,7 @@ const FILE_VALIDATION = {
 type Props = {
   userMessage: string
   isMicRecording: boolean
+  isDeepgramTranscribing?: boolean
   onChangeUserMessage: (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => void
@@ -34,12 +37,17 @@ type Props = {
   isSpeaking: boolean
   silenceTimeoutRemaining: number | null
   continuousMicListeningMode: boolean
-  onToggleContinuousMode: (event: React.MouseEvent<HTMLButtonElement>) => void
+  showSpeechInputToggles?: boolean
+  speechRecognitionMode?: SpeechRecognitionMode
+  deepgramAutoSend?: boolean
+  onContinuousMicChange?: (enabled: boolean) => void
+  onDeepgramAutoSendChange?: (enabled: boolean) => void
 }
 
 export const MessageInput = ({
   userMessage,
   isMicRecording,
+  isDeepgramTranscribing = false,
   onChangeUserMessage,
   onClickMicButton,
   onClickSendButton,
@@ -47,6 +55,11 @@ export const MessageInput = ({
   isSpeaking,
   silenceTimeoutRemaining,
   continuousMicListeningMode,
+  showSpeechInputToggles = false,
+  speechRecognitionMode = 'browser',
+  deepgramAutoSend = true,
+  onContinuousMicChange,
+  onDeepgramAutoSendChange,
 }: Props) => {
   const chatProcessing = homeStore((s) => s.chatProcessing)
   const slidePlaying = slideStore((s) => s.isPlaying)
@@ -147,6 +160,15 @@ export const MessageInput = ({
     const newRows = calculateRows(userMessage)
     setRows(newRows)
   }, [userMessage, calculateRows])
+
+  // 音声認識中は入力欄を末尾までスクロール
+  useEffect(() => {
+    if (!isMicRecording || !textareaRef.current) return
+    const el = textareaRef.current
+    el.scrollTop = el.scrollHeight
+    const len = userMessage.length
+    el.setSelectionRange(len, len)
+  }, [userMessage, isMicRecording])
 
   // 共通の遅延行数更新処理
   const updateRowsWithDelay = useCallback(
@@ -478,23 +500,53 @@ export const MessageInput = ({
             </div>
           )}
 
+          {showSpeechInputToggles && (
+            <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <span className="font-bold text-theme-default whitespace-nowrap">
+                  {t('ContinuousMic')}
+                </span>
+                <ToggleSwitch
+                  enabled={continuousMicListeningMode}
+                  disabled={chatProcessing || isSpeaking}
+                  onChange={(enabled) => onContinuousMicChange?.(enabled)}
+                />
+              </label>
+              {speechRecognitionMode === 'deepgram' && (
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <span className="font-bold text-theme-default whitespace-nowrap">
+                    {t('DeepgramAutoSend')}
+                  </span>
+                  <ToggleSwitch
+                    enabled={deepgramAutoSend}
+                    disabled={chatProcessing}
+                    onChange={(enabled) =>
+                      onDeepgramAutoSendChange?.(enabled)
+                    }
+                  />
+                </label>
+              )}
+              {continuousMicListeningMode && isMicRecording && (
+                <span className="text-xs font-bold text-green-600">
+                  {t('ContinuousMicActive')}
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-2 items-end">
             <div className="flex-shrink-0 pb-[0.3rem]">
               <IconButton
-                iconName={
-                  continuousMicListeningMode ? '24/Close' : '24/Microphone'
-                }
+                iconName="24/Microphone"
                 backgroundColor={
-                  continuousMicListeningMode
-                    ? isMicRecording
-                      ? 'bg-green-500 text-theme'
-                      : 'bg-green-600 text-theme'
-                    : undefined
+                  isMicRecording
+                    ? 'bg-green-500 text-theme'
+                    : continuousMicListeningMode
+                      ? 'bg-green-600 text-theme'
+                      : undefined
                 }
-                isProcessing={isMicRecording}
-                isProcessingIcon={
-                  continuousMicListeningMode ? '24/Microphone' : '24/PauseAlt'
-                }
+                isProcessing={isMicRecording && !continuousMicListeningMode}
+                isProcessingIcon="24/PauseAlt"
                 disabled={
                   continuousMicListeningMode || chatProcessing || isSpeaking
                 }
@@ -549,11 +601,13 @@ export const MessageInput = ({
                 placeholder={
                   chatProcessing
                     ? `${t('AnswerGenerating')}${loadingDots}`
-                    : continuousMicListeningMode && isMicRecording
-                      ? t('ListeningContinuously')
-                      : isMultiModalSupported && !isSmallScreen
-                        ? `${t('EnterYourQuestion')} (${t('PasteImageSupported') || 'Paste image supported'})`
-                        : t('EnterYourQuestion')
+                    : isDeepgramTranscribing && !userMessage
+                      ? t('DeepgramTranscribingPlaceholder')
+                      : continuousMicListeningMode && isMicRecording
+                        ? t('ListeningContinuously')
+                        : isMultiModalSupported && !isSmallScreen
+                          ? `${t('EnterYourQuestion')} (${t('PasteImageSupported') || 'Paste image supported'})`
+                          : t('EnterYourQuestion')
                 }
                 onChange={handleTextChange}
                 onPaste={handlePaste}

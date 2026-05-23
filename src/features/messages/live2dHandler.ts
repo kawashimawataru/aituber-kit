@@ -120,8 +120,8 @@ export class Live2DHandler {
         },
       })
 
-      // フォールバック: 音声の理論上の再生時間 + 1 秒で強制解決
-      const fallbackTimeout = durationSec * 1000 + 1000
+      // フォールバック: 音声の理論上の再生時間 + 余裕で強制解決
+      const fallbackTimeout = durationSec * 1000 + 200
       setTimeout(finish, fallbackTimeout)
     })
   }

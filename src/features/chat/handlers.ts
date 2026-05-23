@@ -35,6 +35,7 @@ import {
   finalizeStyleBertVits2Tail,
   isInvalidStandaloneTtsUnit,
 } from '@/utils/ttsSentenceSplit'
+import { sbv2SpeakBatcher } from '@/features/messages/sbv2SpeakBatcher'
 
 // セッションIDを生成する関数
 const generateSessionId = () => generateMessageId()
@@ -498,6 +499,9 @@ export const speakMessageHandler = async (receivedMessage: string) => {
  */
 export const processAIResponse = async (messages: Message[]) => {
   const sessionId = generateSessionId()
+  if (settingsStore.getState().selectVoice === 'stylebertvits2') {
+    sbv2SpeakBatcher.clear()
+  }
   homeStore.setState({ chatProcessing: true })
 
   // 思考中ポーズの適用
@@ -884,6 +888,10 @@ export const processAIResponse = async (messages: Message[]) => {
     console.error('Error processing AI response stream:', e)
   } finally {
     reader.releaseLock()
+  }
+
+  if (settingsStore.getState().selectVoice === 'stylebertvits2') {
+    sbv2SpeakBatcher.flushNow()
   }
 
   if (didStreamProcessingFail || !hasSpeakBeenCalled) {

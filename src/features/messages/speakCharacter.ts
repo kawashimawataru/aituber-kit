@@ -4,6 +4,7 @@ import { AIVoice } from '@/features/constants/settings'
 import { wait } from '@/utils/wait'
 import { Talk } from './messages'
 import { synthesizeStyleBertVITS2Api } from './synthesizeStyleBertVITS2'
+import { synthesizeVoiceIrodoriTtsApi } from './synthesizeVoiceIrodoriTts'
 import { synthesizeVoiceKoeiromapApi } from './synthesizeVoiceKoeiromap'
 import { synthesizeVoiceElevenlabsApi } from './synthesizeVoiceElevenlabs'
 import { synthesizeVoiceCartesiaApi } from './synthesizeVoiceCartesia'
@@ -17,14 +18,31 @@ import { synthesizeVoiceAzureOpenAIApi } from './synthesizeVoiceAzureOpenAI'
 import toastStore from '@/features/stores/toast'
 import i18next from 'i18next'
 import { SpeakQueue } from './speakQueue'
+import {
+  PrefetchSpeakPipeline,
+  INTER_SENTENCE_PAUSE_MS,
+} from './prefetchSpeakPipeline'
+import { sbv2SpeakBatcher } from './sbv2SpeakBatcher'
 import { Live2DHandler } from './live2dHandler'
 import { PNGTuberHandler } from '@/features/pngTuber/pngTuberHandler'
 import {
   asyncConvertEnglishToJapaneseReading,
   containsEnglish,
 } from '@/utils/textProcessing'
+import { stripSpeakControlTags } from '@/utils/speakControlTags'
 
 const speakQueue = SpeakQueue.getInstance()
+const prefetchPipeline = PrefetchSpeakPipeline.getInstance()
+
+sbv2SpeakBatcher.setSink((sessionId, mergedTalk, batchOnComplete) => {
+  prefetchPipeline.enqueue(
+    sessionId,
+    mergedTalk,
+    (t) => synthesizeVoice(t, 'stylebertvits2'),
+    SpeakQueue.currentStopToken,
+    batchOnComplete
+  )
+})
 
 export function preprocessMessage(
   message: string,
@@ -34,11 +52,17 @@ export function preprocessMessage(
   let processed: string | null = message.trim()
   if (!processed) return null
 
-  // 絵文字を削除 (これを先に行うことで変換対象のテキスト量を減らす)
-  processed = processed.replace(
-    /[\u{1F300}-\u{1F9FF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1F1E0}-\u{1F1FF}]/gu,
-    ''
-  )
+  // 感情・モーション等の制御タグは TTS に読ませない
+  processed = stripSpeakControlTags(processed)
+  if (!processed) return null
+
+  // Irodori-TTS は絵文字で感情制御するため削除しない
+  if (settings.selectVoice !== 'irodoritts') {
+    processed = processed.replace(
+      /[\u{1F300}-\u{1F9FF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1F1E0}-\u{1F1FF}]/gu,
+      ''
+    )
+  }
 
   // 発音として不適切な記号のみで構成されているかチェック
   // 感嘆符、疑問符、句読点、括弧類、引用符、数学記号、その他一般的な記号を含む
@@ -110,6 +134,16 @@ async function synthesizeVoice(
           ss.stylebertvits2SdpRatio,
           ss.stylebertvits2Length,
           ss.selectLanguage
+        )
+      case 'irodoritts':
+        return await synthesizeVoiceIrodoriTtsApi(
+          talk,
+          ss.irodoriTtsServerUrl,
+          ss.irodoriTtsApiKey,
+          ss.irodoriTtsVoice,
+          ss.irodoriTtsModel,
+          ss.irodoriTtsSpeed,
+          ss.irodoriTtsInjectEmotion
         )
       case 'aivis_speech':
         return await synthesizeVoiceAivisSpeechApi(
@@ -227,11 +261,34 @@ const createSpeakCharacter = () => {
       talk.message = ''
     }
 
+    // SBV2: 短時間バッファして1リクエストにまとめる
+    if (ss.selectVoice === 'stylebertvits2' && !talk.buffer) {
+      sbv2SpeakBatcher.enqueue(sessionId, talk, () => {
+        if (onComplete && !called) {
+          called = true
+          onComplete()
+        }
+      })
+      return
+    }
+
+    // Irodori: 合成を並列化し再生は順序維持（先読み）
+    if (ss.selectVoice === 'irodoritts' && !talk.buffer) {
+      prefetchPipeline.enqueue(
+        sessionId,
+        talk,
+        (t) => synthesizeVoice(t, ss.selectVoice),
+        initialToken,
+        onComplete
+      )
+      return
+    }
+
     let isNeedDecode = true
 
     const processAndSynthesizePromise = prevFetchPromise.then(async () => {
       const now = Date.now()
-      const minGapMs = ss.selectVoice === 'stylebertvits2' ? 0 : 1000
+      const minGapMs = INTER_SENTENCE_PAUSE_MS
       if (minGapMs > 0 && now - lastTime < minGapMs) {
         await wait(minGapMs - (now - lastTime))
       }
@@ -374,6 +431,7 @@ export const testVoice = async (voiceType: AIVoice, customText?: string) => {
     koeiromap: 'コエイロマップを使用します',
     google: 'Google Text-to-Speechを使用します',
     stylebertvits2: 'StyleBertVITS2を使用します',
+    irodoritts: 'Irodori-TTSを使用します',
     gsvitts: 'GSVI TTSを使用します',
     elevenlabs: 'ElevenLabsを使用します',
     cartesia: 'Cartesiaを使用します',

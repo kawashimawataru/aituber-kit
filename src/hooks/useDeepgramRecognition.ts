@@ -5,26 +5,22 @@ import toastStore from '@/features/stores/toast'
 import homeStore from '@/features/stores/home'
 import { SpeakQueue } from '@/features/messages/speakQueue'
 import { updateSituation } from '@/features/chat/situationModel'
-
-const DEEPGRAM_WS_URL = 'wss://api.deepgram.com/v1/listen'
-
-// Deepgram Live Streaming API のクエリパラメータ
-function buildDeepgramUrl(language: string): string {
-  const langCode = language === 'ja' ? 'ja' : language === 'zh-CN' || language === 'zh-TW' ? 'zh' : language === 'ko' ? 'ko' : 'en-US'
-  const params = new URLSearchParams({
-    model: 'nova-2',
-    language: langCode,
-    punctuate: 'true',
-    endpointing: '300',
-    utterance_end_ms: '1000',
-    interim_results: 'true',
-    smart_format: 'true',
-  })
-  return `${DEEPGRAM_WS_URL}?${params.toString()}`
-}
+import {
+  buildDeepgramLiveUrl,
+  calculateRms,
+  fetchDeepgramAuthKey,
+  float32ToInt16,
+  mergeDeepgramPartial,
+  sendDeepgramCloseStream,
+  DEEPGRAM_SILENCE_RMS,
+  DEEPGRAM_VOICE_START_HOLD_MS,
+} from '@/utils/deepgramLive'
 
 /**
- * Deepgram Live Streaming APIを使用した常時ON音声認識フック
+ * Deepgram Live Streaming（pngtuber-main 準拠）
+ * - linear16 PCM ストリーミング
+ * - 常時 ON: マイク常時開放 + VAD で発話検知 → 発話終了で自動送信
+ * - endpointing / speech_final / UtteranceEnd で確定
  */
 export function useDeepgramRecognition(
   onChatProcessStart: (text: string) => void
@@ -32,61 +28,294 @@ export function useDeepgramRecognition(
   const { t } = useTranslation()
   const selectLanguage = settingsStore((s) => s.selectLanguage)
   const deepgramApiKey = settingsStore((s) => s.deepgramApiKey)
+  const deepgramAutoSend = settingsStore((s) => s.deepgramAutoSend)
+  const deepgramEndpointingMs = settingsStore((s) => s.deepgramEndpointingMs)
+  const deepgramModel = settingsStore((s) => s.deepgramModel)
+  const deepgramSilenceHoldMs = settingsStore((s) => s.deepgramSilenceHoldMs)
+  const continuousMicListeningMode = settingsStore(
+    (s) => s.continuousMicListeningMode
+  )
 
   const [userMessage, setUserMessage] = useState('')
   const [isListening, setIsListening] = useState(false)
   const isListeningRef = useRef(false)
 
   const wsRef = useRef<WebSocket | null>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const interimTranscriptRef = useRef('')
-  const finalTranscriptRef = useRef('')
-  const utteranceBufferRef = useRef<string[]>([])
+  const utteranceStreamRef = useRef<MediaStream | null>(null)
+  const alwaysOnStreamRef = useRef<MediaStream | null>(null)
+  const pcmContextRef = useRef<AudioContext | null>(null)
+  const pcmProcessorRef = useRef<ScriptProcessorNode | null>(null)
+  const pcmSourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const alwaysOnContextRef = useRef<AudioContext | null>(null)
+  const alwaysOnAnalyserRef = useRef<AnalyserNode | null>(null)
+  const alwaysOnRafRef = useRef<number | null>(null)
+  const alwaysOnVoiceSinceRef = useRef<number | null>(null)
+  const silenceAnalyserRef = useRef<AnalyserNode | null>(null)
+  const silenceRafRef = useRef<number | null>(null)
+  const silentSinceRef = useRef<number | null>(null)
 
-  const stopListening = useCallback(async () => {
-    isListeningRef.current = false
-    setIsListening(false)
+  const utteranceActiveRef = useRef(false)
+  const confirmedRef = useRef('')
+  const partialRef = useRef('')
+  const authKeyRef = useRef<string | null>(null)
+  const inputSyncTimerRef = useRef<number | null>(null)
 
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop()
+  const chatProcessing = homeStore((s) => s.chatProcessing)
+
+  const syncInputFromTranscript = useCallback((immediate = false) => {
+    const display = [confirmedRef.current, partialRef.current]
+      .filter(Boolean)
+      .join(' ')
+
+    const apply = () => {
+      setUserMessage(display)
+      inputSyncTimerRef.current = null
     }
-    mediaRecorderRef.current = null
 
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop())
-      streamRef.current = null
+    if (immediate) {
+      if (inputSyncTimerRef.current !== null) {
+        clearTimeout(inputSyncTimerRef.current)
+        inputSyncTimerRef.current = null
+      }
+      apply()
+      return
     }
 
-    if (wsRef.current) {
-      wsRef.current.close()
-      wsRef.current = null
-    }
-
-    finalTranscriptRef.current = ''
-    interimTranscriptRef.current = ''
-    setUserMessage('')
+    if (inputSyncTimerRef.current !== null) return
+    inputSyncTimerRef.current = window.setTimeout(apply, 80)
   }, [])
 
-  const startListening = useCallback(async () => {
-    if (isListeningRef.current) return
+  const stopSilenceWatcher = useCallback(() => {
+    if (silenceRafRef.current !== null) {
+      cancelAnimationFrame(silenceRafRef.current)
+      silenceRafRef.current = null
+    }
+    silentSinceRef.current = null
+    try {
+      silenceAnalyserRef.current?.disconnect()
+    } catch {
+      // ignore
+    }
+    silenceAnalyserRef.current = null
+  }, [])
 
-    const apiKey = deepgramApiKey || process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY
-
-    if (!apiKey) {
-      // サーバーサイドのトークンエンドポイントから取得を試みる
-      let token: string | null = null
+  const stopPcmPipeline = useCallback(() => {
+    stopSilenceWatcher()
+    if (pcmProcessorRef.current) {
       try {
-        const resp = await fetch('/api/stt-deepgram-token', { method: 'POST' })
-        if (resp.ok) {
-          const data = await resp.json()
-          token = data.token
-        }
+        pcmProcessorRef.current.disconnect()
       } catch {
         // ignore
       }
+      pcmProcessorRef.current.onaudioprocess = null
+      pcmProcessorRef.current = null
+    }
+    try {
+      pcmSourceRef.current?.disconnect()
+    } catch {
+      // ignore
+    }
+    pcmSourceRef.current = null
+    if (pcmContextRef.current) {
+      void pcmContextRef.current.close().catch(() => undefined)
+      pcmContextRef.current = null
+    }
+  }, [stopSilenceWatcher])
 
-      if (!token) {
+  const closeDeepgramWs = useCallback(() => {
+    sendDeepgramCloseStream(wsRef.current)
+    if (wsRef.current) {
+      try {
+        wsRef.current.close()
+      } catch {
+        // ignore
+      }
+      wsRef.current = null
+    }
+  }, [])
+
+  const canAutoSendNow = useCallback(() => {
+    const hs = homeStore.getState()
+    return !hs.isSpeaking && !hs.chatProcessing
+  }, [])
+
+  const dispatchTranscript = useCallback(
+    (text: string) => {
+      const trimmed = text.trim()
+      if (trimmed.length < 2) return
+
+      if (!canAutoSendNow()) {
+        setUserMessage(trimmed)
+        return
+      }
+
+      confirmedRef.current = ''
+      partialRef.current = ''
+      setUserMessage(trimmed)
+
+      updateSituation({ humanSpeaking: false })
+      homeStore.setState({ chatProcessing: true })
+      onChatProcessStart(trimmed)
+    },
+    [canAutoSendNow, onChatProcessStart]
+  )
+
+  const finalizeUtterance = useCallback(
+    async (options?: { send?: boolean }) => {
+      if (!utteranceActiveRef.current) return
+
+      utteranceActiveRef.current = false
+      stopPcmPipeline()
+      closeDeepgramWs()
+
+      if (partialRef.current) {
+        confirmedRef.current = mergeDeepgramPartial(
+          confirmedRef.current,
+          partialRef.current
+        )
+        partialRef.current = ''
+      }
+
+      const text = confirmedRef.current.trim()
+      confirmedRef.current = ''
+      partialRef.current = ''
+
+      const shouldSend =
+        options?.send !== false &&
+        deepgramAutoSend &&
+        text.length >= 2 &&
+        canAutoSendNow()
+
+      if (shouldSend) {
+        dispatchTranscript(text)
+      } else if (text) {
+        setUserMessage(text)
+      } else {
+        setUserMessage('')
+      }
+
+      if (
+        !alwaysOnStreamRef.current &&
+        utteranceStreamRef.current &&
+        !continuousMicListeningMode
+      ) {
+        utteranceStreamRef.current.getTracks().forEach((track) => track.stop())
+      }
+      utteranceStreamRef.current = null
+    },
+    [
+      stopPcmPipeline,
+      closeDeepgramWs,
+      deepgramAutoSend,
+      canAutoSendNow,
+      dispatchTranscript,
+      continuousMicListeningMode,
+    ]
+  )
+
+  const handleDeepgramMessage = useCallback(
+    (raw: string) => {
+      if (!utteranceActiveRef.current) return
+
+      let data: Record<string, unknown>
+      try {
+        data = JSON.parse(raw)
+      } catch {
+        return
+      }
+
+      if (data.type === 'Results') {
+        const channel = data.channel as
+          | { alternatives?: Array<{ transcript?: string }> }
+          | undefined
+        const alt = channel?.alternatives?.[0]
+        if (!alt) return
+
+        const transcript = (alt.transcript || '').trim()
+        const isFinal = data.is_final === true
+        const speechFinal = data.speech_final === true
+
+        if (isFinal && transcript) {
+          confirmedRef.current = mergeDeepgramPartial(
+            confirmedRef.current,
+            transcript
+          )
+          partialRef.current = ''
+          syncInputFromTranscript(true)
+        } else if (!isFinal && transcript) {
+          updateSituation({ humanSpeaking: true })
+          if (partialRef.current && transcript === partialRef.current) {
+            confirmedRef.current = mergeDeepgramPartial(
+              confirmedRef.current,
+              partialRef.current
+            )
+            partialRef.current = ''
+          } else {
+            partialRef.current = transcript
+          }
+          syncInputFromTranscript()
+        }
+
+        if (speechFinal && deepgramAutoSend) {
+          void finalizeUtterance({ send: true })
+        } else if (speechFinal) {
+          updateSituation({ humanSpeaking: false })
+        }
+      } else if (data.type === 'UtteranceEnd') {
+        updateSituation({ humanSpeaking: false })
+        if (deepgramAutoSend) {
+          void finalizeUtterance({ send: true })
+        }
+      }
+    },
+    [deepgramAutoSend, finalizeUtterance, syncInputFromTranscript]
+  )
+
+  const startSilenceWatcher = useCallback(
+    (stream: MediaStream) => {
+      stopSilenceWatcher()
+      const ctx = new AudioContext()
+      const src = ctx.createMediaStreamSource(stream)
+      const analyser = ctx.createAnalyser()
+      analyser.fftSize = 1024
+      src.connect(analyser)
+      silenceAnalyserRef.current = analyser
+
+      const buf = new Float32Array(analyser.fftSize)
+      const tick = () => {
+        if (!utteranceActiveRef.current || !silenceAnalyserRef.current) return
+        silenceAnalyserRef.current.getFloatTimeDomainData(buf)
+        const rms = calculateRms(buf)
+        const now = performance.now()
+
+        if (rms < DEEPGRAM_SILENCE_RMS) {
+          if (silentSinceRef.current === null) silentSinceRef.current = now
+          if (now - silentSinceRef.current > deepgramSilenceHoldMs) {
+            void finalizeUtterance({ send: deepgramAutoSend })
+            return
+          }
+        } else {
+          silentSinceRef.current = null
+        }
+        silenceRafRef.current = requestAnimationFrame(tick)
+      }
+      silenceRafRef.current = requestAnimationFrame(tick)
+    },
+    [
+      stopSilenceWatcher,
+      deepgramSilenceHoldMs,
+      deepgramAutoSend,
+      finalizeUtterance,
+    ]
+  )
+
+  const beginUtteranceStream = useCallback(
+    async (stream: MediaStream) => {
+      if (utteranceActiveRef.current) return
+
+      const authKey =
+        authKeyRef.current || (await fetchDeepgramAuthKey(deepgramApiKey))
+      if (!authKey) {
         toastStore.getState().addToast({
           message: t('Toasts.DeepgramApiKeyRequired'),
           type: 'error',
@@ -94,7 +323,121 @@ export function useDeepgramRecognition(
         })
         return
       }
+      authKeyRef.current = authKey
+
+      utteranceStreamRef.current = stream
+      utteranceActiveRef.current = true
+      confirmedRef.current = ''
+      partialRef.current = ''
+      setUserMessage('')
+
+      const pcmContext = new AudioContext()
+      pcmContextRef.current = pcmContext
+      const sampleRate = pcmContext.sampleRate
+
+      const wsUrl = buildDeepgramLiveUrl({
+        language: selectLanguage,
+        sampleRate,
+        model: deepgramModel,
+        endpointingMs: deepgramEndpointingMs,
+      })
+
+      const ws = new WebSocket(wsUrl, ['token', authKey])
+      wsRef.current = ws
+
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error('Deepgram connection timeout')),
+          8000
+        )
+        ws.onopen = () => {
+          clearTimeout(timer)
+          resolve()
+        }
+        ws.onerror = () => {
+          clearTimeout(timer)
+          reject(new Error('Deepgram WebSocket error'))
+        }
+      })
+
+      ws.onmessage = (event) => {
+        if (typeof event.data === 'string') {
+          handleDeepgramMessage(event.data)
+        }
+      }
+
+      ws.onclose = () => {
+        if (utteranceActiveRef.current) {
+          void finalizeUtterance({ send: false })
+        }
+      }
+
+      startSilenceWatcher(stream)
+
+      const source = pcmContext.createMediaStreamSource(stream)
+      pcmSourceRef.current = source
+      const processor = pcmContext.createScriptProcessor(4096, 1, 1)
+      pcmProcessorRef.current = processor
+
+      processor.onaudioprocess = (ev) => {
+        if (
+          !utteranceActiveRef.current ||
+          !wsRef.current ||
+          wsRef.current.readyState !== WebSocket.OPEN
+        ) {
+          return
+        }
+        const input = ev.inputBuffer.getChannelData(0)
+        const int16 = float32ToInt16(input)
+        try {
+          wsRef.current.send(int16.buffer)
+        } catch {
+          // ignore
+        }
+      }
+
+      source.connect(processor)
+      const mute = pcmContext.createGain()
+      mute.gain.value = 0
+      processor.connect(mute)
+      mute.connect(pcmContext.destination)
+    },
+    [
+      deepgramApiKey,
+      selectLanguage,
+      deepgramModel,
+      deepgramEndpointingMs,
+      handleDeepgramMessage,
+      finalizeUtterance,
+      startSilenceWatcher,
+      t,
+    ]
+  )
+
+  const stopAlwaysOnLoop = useCallback(() => {
+    if (alwaysOnRafRef.current !== null) {
+      cancelAnimationFrame(alwaysOnRafRef.current)
+      alwaysOnRafRef.current = null
     }
+    alwaysOnVoiceSinceRef.current = null
+    try {
+      alwaysOnAnalyserRef.current?.disconnect()
+    } catch {
+      // ignore
+    }
+    alwaysOnAnalyserRef.current = null
+    if (alwaysOnContextRef.current) {
+      void alwaysOnContextRef.current.close().catch(() => undefined)
+      alwaysOnContextRef.current = null
+    }
+    if (alwaysOnStreamRef.current) {
+      alwaysOnStreamRef.current.getTracks().forEach((track) => track.stop())
+      alwaysOnStreamRef.current = null
+    }
+  }, [])
+
+  const startAlwaysOnLoop = useCallback(async () => {
+    if (alwaysOnStreamRef.current) return
 
     let stream: MediaStream
     try {
@@ -108,155 +451,133 @@ export function useDeepgramRecognition(
       return
     }
 
-    streamRef.current = stream
+    alwaysOnStreamRef.current = stream
+    const ctx = new AudioContext()
+    alwaysOnContextRef.current = ctx
+    const src = ctx.createMediaStreamSource(stream)
+    const analyser = ctx.createAnalyser()
+    analyser.fftSize = 1024
+    src.connect(analyser)
+    alwaysOnAnalyserRef.current = analyser
 
-    const wsUrl = buildDeepgramUrl(selectLanguage)
-    const authKey = deepgramApiKey || ''
+    const buf = new Float32Array(analyser.fftSize)
+    const tick = () => {
+      if (!isListeningRef.current || !alwaysOnAnalyserRef.current) return
 
-    // トークン or APIキー直接認証
-    let ws: WebSocket
-    try {
-      ws = new WebSocket(wsUrl, ['token', authKey])
-    } catch {
-      stream.getTracks().forEach((t) => t.stop())
+      if (!utteranceActiveRef.current) {
+        alwaysOnAnalyserRef.current.getFloatTimeDomainData(buf)
+        const rms = calculateRms(buf)
+        const now = performance.now()
+
+        if (rms >= DEEPGRAM_SILENCE_RMS) {
+          if (alwaysOnVoiceSinceRef.current === null) {
+            alwaysOnVoiceSinceRef.current = now
+          }
+          if (
+            now - alwaysOnVoiceSinceRef.current >=
+              DEEPGRAM_VOICE_START_HOLD_MS &&
+            canAutoSendNow()
+          ) {
+            alwaysOnVoiceSinceRef.current = null
+            void beginUtteranceStream(alwaysOnStreamRef.current!)
+          }
+        } else {
+          alwaysOnVoiceSinceRef.current = null
+        }
+      }
+
+      alwaysOnRafRef.current = requestAnimationFrame(tick)
+    }
+    alwaysOnRafRef.current = requestAnimationFrame(tick)
+  }, [beginUtteranceStream, canAutoSendNow, t])
+
+  const stopListening = useCallback(async () => {
+    isListeningRef.current = false
+    setIsListening(false)
+
+    await finalizeUtterance({ send: false })
+    stopAlwaysOnLoop()
+    authKeyRef.current = null
+    confirmedRef.current = ''
+    partialRef.current = ''
+    setUserMessage('')
+  }, [finalizeUtterance, stopAlwaysOnLoop])
+
+  const startListening = useCallback(async () => {
+    if (isListeningRef.current) return
+
+    isListeningRef.current = true
+    setIsListening(true)
+
+    if (continuousMicListeningMode) {
+      await startAlwaysOnLoop()
       return
     }
 
-    wsRef.current = ws
-
-    ws.onopen = () => {
-      isListeningRef.current = true
-      setIsListening(true)
-      finalTranscriptRef.current = ''
-      interimTranscriptRef.current = ''
-      utteranceBufferRef.current = []
-
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : 'audio/webm'
-
-      const mr = new MediaRecorder(stream, { mimeType })
-      mediaRecorderRef.current = mr
-
-      mr.ondataavailable = (e) => {
-        if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-          ws.send(e.data)
-        }
-      }
-
-      mr.start(100) // 100ms ごとにチャンク送信
+    let stream: MediaStream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch {
+      isListeningRef.current = false
+      setIsListening(false)
+      toastStore.getState().addToast({
+        message: t('Toasts.MicrophonePermissionDenied'),
+        type: 'error',
+        tag: 'microphone-permission-error',
+      })
+      return
     }
 
-    ws.onmessage = (event) => {
-      if (!isListeningRef.current) return
-
-      let data: any
-      try {
-        data = JSON.parse(event.data)
-      } catch {
-        return
-      }
-
-      if (data.type === 'Results') {
-        const alt = data.channel?.alternatives?.[0]
-        if (!alt) return
-
-        const transcript: string = alt.transcript || ''
-        const isFinal: boolean = data.is_final === true
-        const speechFinal: boolean = data.speech_final === true
-
-        if (isFinal && transcript.trim()) {
-          // 最終確定テキストをバッファに追加
-          utteranceBufferRef.current.push(transcript.trim())
-          interimTranscriptRef.current = ''
-          finalTranscriptRef.current = utteranceBufferRef.current.join(' ')
-          setUserMessage(finalTranscriptRef.current)
-        } else if (!isFinal && transcript) {
-          // 暫定認識中 = 人間が話している
-          updateSituation({ humanSpeaking: true })
-          interimTranscriptRef.current = transcript
-          setUserMessage(
-            [finalTranscriptRef.current, transcript].filter(Boolean).join(' ')
-          )
-        }
-
-        // speech_final = 発話の切れ目 → 送信トリガー
-        if (speechFinal && utteranceBufferRef.current.length > 0) {
-          updateSituation({ humanSpeaking: false })
-          const toSend = utteranceBufferRef.current.join(' ')
-          utteranceBufferRef.current = []
-          finalTranscriptRef.current = ''
-          interimTranscriptRef.current = ''
-          setUserMessage('')
-
-          // AI発話中は蓄積しない（割り込み防止）
-          if (!homeStore.getState().isSpeaking) {
-            homeStore.setState({ chatProcessing: true })
-            onChatProcessStart(toSend)
-          }
-        } else if (speechFinal) {
-          // バッファが空でも speech_final なら話し終わり
-          updateSituation({ humanSpeaking: false })
-        }
-      } else if (data.type === 'UtteranceEnd') {
-        // フォールバック: utterance_end_ms 経過後の確定
-        updateSituation({ humanSpeaking: false })
-        if (utteranceBufferRef.current.length > 0) {
-          const toSend = utteranceBufferRef.current.join(' ')
-          utteranceBufferRef.current = []
-          finalTranscriptRef.current = ''
-          interimTranscriptRef.current = ''
-          setUserMessage('')
-
-          if (!homeStore.getState().isSpeaking) {
-            homeStore.setState({ chatProcessing: true })
-            onChatProcessStart(toSend)
-          }
-        }
-      }
+    try {
+      await beginUtteranceStream(stream)
+    } catch (error) {
+      console.error('Deepgram utterance start failed:', error)
+      stream.getTracks().forEach((track) => track.stop())
+      isListeningRef.current = false
+      setIsListening(false)
     }
-
-    ws.onerror = (err) => {
-      console.error('Deepgram WebSocket error:', err)
-    }
-
-    ws.onclose = (ev) => {
-      if (isListeningRef.current) {
-        console.warn('Deepgram WS closed unexpectedly, code:', ev.code)
-        // 常時リスニングモードなら再接続
-        if (settingsStore.getState().continuousMicListeningMode) {
-          setTimeout(() => {
-            if (isListeningRef.current) {
-              stopListening().then(startListening)
-            }
-          }, 1000)
-        } else {
-          isListeningRef.current = false
-          setIsListening(false)
-        }
-      }
-    }
-  }, [deepgramApiKey, selectLanguage, onChatProcessStart, stopListening, t])
+  }, [continuousMicListeningMode, startAlwaysOnLoop, beginUtteranceStream, t])
 
   const toggleListening = useCallback(() => {
     if (isListeningRef.current) {
-      stopListening()
+      if (utteranceActiveRef.current) {
+        void finalizeUtterance({ send: deepgramAutoSend })
+      } else {
+        void stopListening()
+      }
     } else {
       homeStore.setState({ isSpeaking: false })
       SpeakQueue.stopAll()
-      startListening()
+      void startListening()
     }
-  }, [startListening, stopListening])
+  }, [finalizeUtterance, deepgramAutoSend, stopListening, startListening])
 
   const handleSendMessage = useCallback(async () => {
     const msg = userMessage.trim()
     if (!msg) return
     homeStore.setState({ isSpeaking: false })
     SpeakQueue.stopAll()
-    await stopListening()
+    await finalizeUtterance({ send: false })
+    if (continuousMicListeningMode) {
+      isListeningRef.current = true
+      setIsListening(true)
+      if (!alwaysOnStreamRef.current) {
+        await startAlwaysOnLoop()
+      }
+    } else {
+      await stopListening()
+    }
+    homeStore.setState({ chatProcessing: true })
     onChatProcessStart(msg)
     setUserMessage('')
-  }, [userMessage, onChatProcessStart, stopListening])
+  }, [
+    userMessage,
+    onChatProcessStart,
+    finalizeUtterance,
+    continuousMicListeningMode,
+    startAlwaysOnLoop,
+    stopListening,
+  ])
 
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -265,12 +586,32 @@ export function useDeepgramRecognition(
     []
   )
 
-  // アンマウント時のクリーンアップ
+  const checkRecognitionActive = useCallback(() => {
+    if (!isListeningRef.current) return false
+    if (continuousMicListeningMode) {
+      return alwaysOnStreamRef.current !== null
+    }
+    return utteranceActiveRef.current
+  }, [continuousMicListeningMode])
+
+  useEffect(() => {
+    if (chatProcessing) {
+      if (inputSyncTimerRef.current !== null) {
+        clearTimeout(inputSyncTimerRef.current)
+        inputSyncTimerRef.current = null
+      }
+      setUserMessage('')
+      confirmedRef.current = ''
+      partialRef.current = ''
+    }
+  }, [chatProcessing])
+
   useEffect(() => {
     return () => {
-      if (isListeningRef.current) {
-        stopListening()
+      if (inputSyncTimerRef.current !== null) {
+        clearTimeout(inputSyncTimerRef.current)
       }
+      void stopListening()
     }
   }, [stopListening])
 
@@ -285,6 +626,7 @@ export function useDeepgramRecognition(
       toggleListening,
       startListening,
       stopListening,
+      checkRecognitionActive,
     }),
     [
       userMessage,
@@ -294,6 +636,7 @@ export function useDeepgramRecognition(
       toggleListening,
       startListening,
       stopListening,
+      checkRecognitionActive,
     ]
   )
 }

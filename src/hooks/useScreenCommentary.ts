@@ -3,6 +3,7 @@ import settingsStore from '@/features/stores/settings'
 import homeStore from '@/features/stores/home'
 import { captureFrameFromVideo, computeFrameDiff } from '@/features/vision/screenCapture'
 import { generateScreenCommentary } from '@/features/vision/screenCommentator'
+import { updateSituation } from '@/features/chat/situationModel'
 
 /**
  * 画面実況フック
@@ -34,6 +35,8 @@ export function useScreenCommentary(
       // 差分チェック
       if (lastFrameRef.current) {
         const diff = await computeFrameDiff(lastFrameRef.current, frame)
+        // 状況モデルに画面変化スコアを反映
+        updateSituation({ screenChangeScore: diff })
         if (diff < ss.screenCommentaryThreshold) return
       }
 

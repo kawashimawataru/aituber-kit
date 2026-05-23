@@ -3,6 +3,7 @@ import Image from 'next/image'
 
 import AdvancedSettings from './advancedSettings'
 import ChatLogExport from './chatLogExport'
+import CoStreamingSettings from './coStreamingSettings'
 import MessageReceiverSetting from './messageReceiver'
 import PresetQuestions from './presetQuestions'
 import ScreenCommentarySettings from './screenCommentarySettings'
@@ -24,6 +25,7 @@ const Other = () => {
       </div>
 
       <AdvancedSettings />
+      <CoStreamingSettings />
       <ScreenCommentarySettings />
       <ChatLogExport />
       <PresetQuestions />

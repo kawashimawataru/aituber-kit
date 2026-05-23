@@ -23,6 +23,9 @@
 
 | ID | 内容 | 完了日 |
 |----|------|--------|
+| 4-4 | 状況モデル配線: Deepgram→`humanSpeaking`、画面実況→`screenChangeScore`、`shouldProactivelySpeak`→`canSpeak` | 2026-05-23 |
+| 4-5 | `coStreamingMode` / `coStreamerName` を settingsStore に追加 + 設定画面 UI | 2026-05-23 |
+| 6-5 | stunt 用 VRM ポーズ JSON 11本生成（`scripts/generate-stunt-poses.mjs`）+ poseConfigs に追加 | 2026-05-23 |
 | P0-1 | `scripts/generate-placeholder-se.mjs` + 9ファイル WAV 生成（public/assets/reactions/） | 2026-05-23 |
 | P0-3 | `co-streaming-preset.md` プリセット B にタグ構文リファレンス追記 | 2026-05-23 |
 | P1 | TTFR/TTFA `performance.mark` 計測を handlers.ts に追加（console.info 出力） | 2026-05-23 |
@@ -61,10 +64,11 @@
 
 ## 次にやること（優先順）
 
-1. **SE 差し替え** `public/assets/reactions/` の無音プレースホルダーを実音源に差し替え（`scripts/generate-placeholder-se.mjs` 参照）
-2. **実機 E2E** `docs/project/e2e-youtube-checklist.md` のチェックリストを順番に確認・記録
-3. **Phase 5** OBS 連携ガイド・共演ドキュメント整備（`docs/project/phases/phase-05-co-streaming.md`）
-4. **stunt モーション素材** poseConfigs に `stunt_lean_in` 等の VRM ポーズ JSON を追加
+1. **SE 差し替え** `public/assets/reactions/` の無音プレースホルダーを実音源に差し替え
+2. **stunt ポーズ調整** `[stunt:lean_in]` 等を実機で確認し、値を微調整（VRM エディタ推奨）
+3. **実機 E2E** `docs/project/e2e-youtube-checklist.md` のチェックリストを全項目確認
+4. **Phase 5** OBS 連携ガイド整備
+5. **Phase 4.5 残り** TTS パイプライン並列化（文N生成と文N-1再生のオーバーラップ）
 
 ---
 

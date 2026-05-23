@@ -263,6 +263,9 @@ interface General {
   screenCommentaryInterval: number
   screenCommentaryThreshold: number
   screenCommentaryPrompt: string
+  // Phase 4: 共演配信モード
+  coStreamingMode: boolean
+  coStreamerName: string
 }
 
 interface ModelType {
@@ -635,6 +638,9 @@ const getInitialValuesFromEnv = (): SettingsState => ({
   screenCommentaryInterval: 30,
   screenCommentaryThreshold: 0.05,
   screenCommentaryPrompt: '',
+  coStreamingMode:
+    process.env.NEXT_PUBLIC_CO_STREAMING_MODE === 'true' || false,
+  coStreamerName: process.env.NEXT_PUBLIC_CO_STREAMER_NAME || '',
 
   // Settings
   modelType:
@@ -681,6 +687,18 @@ const getInitialValuesFromEnv = (): SettingsState => ({
       sequence: ['/poses/clap1.json', '/poses/clap2.json'],
       switchDuration: 0.2,
     },
+    // stunt ポーズ（Phase 6）
+    { id: 'stunt_lean_in', json: '/poses/stunt_lean_in.json' },
+    { id: 'stunt_lean_forward', json: '/poses/stunt_lean_forward.json' },
+    { id: 'stunt_lean_back', json: '/poses/stunt_lean_back.json' },
+    { id: 'stunt_tilt_head', json: '/poses/stunt_tilt_head.json' },
+    { id: 'stunt_flinch', json: '/poses/stunt_flinch.json' },
+    { id: 'stunt_head_hold', json: '/poses/stunt_head_hold.json' },
+    { id: 'stunt_slam', json: '/poses/stunt_slam.json' },
+    { id: 'stunt_slam_light', json: '/poses/stunt_slam_light.json' },
+    { id: 'stunt_rage_quiver', json: '/poses/stunt_rage_quiver.json' },
+    { id: 'stunt_collapse', json: '/poses/stunt_collapse.json' },
+    { id: 'stunt_point', json: '/poses/stunt_point.json' },
   ],
   thinkingPoseEnabled:
     process.env.NEXT_PUBLIC_THINKING_POSE_ENABLED === 'true' || false,
@@ -1062,6 +1080,8 @@ const settingsStore = create<SettingsState>()(
         screenCommentaryInterval: state.screenCommentaryInterval,
         screenCommentaryThreshold: state.screenCommentaryThreshold,
         screenCommentaryPrompt: state.screenCommentaryPrompt,
+        coStreamingMode: state.coStreamingMode,
+        coStreamerName: state.coStreamerName,
         memoryEnabled: state.memoryEnabled,
         memorySimilarityThreshold: state.memorySimilarityThreshold,
         memorySearchLimit: state.memorySearchLimit,

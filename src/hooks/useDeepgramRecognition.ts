@@ -4,6 +4,7 @@ import settingsStore from '@/features/stores/settings'
 import toastStore from '@/features/stores/toast'
 import homeStore from '@/features/stores/home'
 import { SpeakQueue } from '@/features/messages/speakQueue'
+import { updateSituation } from '@/features/chat/situationModel'
 
 const DEEPGRAM_WS_URL = 'wss://api.deepgram.com/v1/listen'
 
@@ -171,6 +172,8 @@ export function useDeepgramRecognition(
           finalTranscriptRef.current = utteranceBufferRef.current.join(' ')
           setUserMessage(finalTranscriptRef.current)
         } else if (!isFinal && transcript) {
+          // 暫定認識中 = 人間が話している
+          updateSituation({ humanSpeaking: true })
           interimTranscriptRef.current = transcript
           setUserMessage(
             [finalTranscriptRef.current, transcript].filter(Boolean).join(' ')
@@ -179,6 +182,7 @@ export function useDeepgramRecognition(
 
         // speech_final = 発話の切れ目 → 送信トリガー
         if (speechFinal && utteranceBufferRef.current.length > 0) {
+          updateSituation({ humanSpeaking: false })
           const toSend = utteranceBufferRef.current.join(' ')
           utteranceBufferRef.current = []
           finalTranscriptRef.current = ''
@@ -190,9 +194,13 @@ export function useDeepgramRecognition(
             homeStore.setState({ chatProcessing: true })
             onChatProcessStart(toSend)
           }
+        } else if (speechFinal) {
+          // バッファが空でも speech_final なら話し終わり
+          updateSituation({ humanSpeaking: false })
         }
       } else if (data.type === 'UtteranceEnd') {
         // フォールバック: utterance_end_ms 経過後の確定
+        updateSituation({ humanSpeaking: false })
         if (utteranceBufferRef.current.length > 0) {
           const toSend = utteranceBufferRef.current.join(' ')
           utteranceBufferRef.current = []

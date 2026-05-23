@@ -6,6 +6,7 @@ import { SpeakQueue } from '@/features/messages/speakQueue'
 import { IdlePhrase, EmotionType } from '@/features/idle/idleTypes'
 import { Talk } from '@/features/messages/messages'
 import { generateIdleAIPhrase } from '@/features/idle/generateIdleAIPhrase'
+import { shouldProactivelySpeak } from '@/features/chat/situationModel'
 
 /**
  * アイドル状態の型定義
@@ -133,6 +134,13 @@ export function useIdleMode({
 
     // 人感検知で人がいる場合は発話しない
     if (hs.presenceState !== 'idle') {
+      return false
+    }
+
+    // 共演配信設定が有効な場合は状況モデルも確認する
+    // (humanSpeaking または AI発話直後 の場合は発話しない)
+    const ss = settingsStore.getState()
+    if (ss.coStreamingMode && !shouldProactivelySpeak(ss.idleInterval)) {
       return false
     }
 

@@ -10,6 +10,7 @@ import settingsStore from '@/features/stores/settings'
 import { IconButton } from '../iconButton'
 import { useDraggable } from '@/hooks/useDraggable'
 import { useResizable } from '@/hooks/useResizable'
+import { captureFrameFromVideo } from '@/features/vision/screenCapture'
 
 interface VideoDisplayProps {
   videoRef: React.RefObject<HTMLVideoElement>
@@ -94,17 +95,9 @@ export const VideoDisplay = forwardRef<HTMLDivElement, VideoDisplayProps>(
       )
         return
 
-      const canvas = document.createElement('canvas')
-      canvas.width = videoRef.current.videoWidth
-      canvas.height = videoRef.current.videoHeight
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return
-
-      ctx.drawImage(videoRef.current, 0, 0)
-      const data = canvas.toDataURL('image/png')
+      const data = captureFrameFromVideo(videoRef.current)
 
       if (data !== '') {
-        console.log('capture')
         homeStore.setState({
           modalImage: data,
           triggerShutter: false,

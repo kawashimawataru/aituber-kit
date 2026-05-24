@@ -36,6 +36,7 @@ export default async function handler(
   const irodoriTtsVoice =
     body.irodoriTtsVoice ||
     process.env.NEXT_PUBLIC_IRODORI_TTS_VOICE ||
+    ''
   const irodoriTtsModel =
     body.irodoriTtsModel ||
     process.env.NEXT_PUBLIC_IRODORI_TTS_MODEL ||

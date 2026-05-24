@@ -10,7 +10,7 @@ jest.mock('@/features/vrmViewer/viewer', () => ({
     unloadVRM: jest.fn(),
   })),
 }))
-jest.mock('pixi-live2d-display-lipsyncpatch', () => ({}))
+jest.mock('untitled-pixi-live2d-engine/cubism', () => ({}))
 jest.mock('@/features/memory/memoryStoreSync', () => ({
   addEmbeddingsToMessages: jest.fn((msgs: unknown[]) => Promise.resolve(msgs)),
 }))

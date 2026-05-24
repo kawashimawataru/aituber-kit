@@ -1,8 +1,6 @@
 import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { EMOTIONS } from '@/features/messages/messages'
-
 import homeStore from '@/features/stores/home'
 import settingsStore from '@/features/stores/settings'
 import { messageSelectors } from '@/features/messages/messageSelectors'
@@ -10,6 +8,7 @@ import {
   getImageFromMessageContent,
   getTextFromMessageContent,
 } from '@/utils/multimodalContent'
+import { stripSpeakControlTags } from '@/utils/speakControlTags'
 
 export const ChatLog = () => {
   const chatScrollRef = useRef<HTMLDivElement>(null)
@@ -80,10 +79,10 @@ export const ChatLog = () => {
   return (
     <div
       ref={chatLogRef}
-      className="absolute h-[100svh] pb-16 z-10 max-w-full"
+      className="absolute h-[100svh] pb-28 z-10 max-w-full"
       style={{ width: `${chatLogWidth}px` }}
     >
-      <div className="max-h-full px-2 sm:px-4 pt-24 pb-16 overflow-y-auto scroll-hidden">
+      <div className="max-h-full px-2 sm:px-4 pt-24 pb-28 overflow-y-auto scroll-hidden">
         {messages.map((msg, i) => {
           return (
             <div key={i} ref={messages.length - 1 === i ? chatScrollRef : null}>
@@ -149,10 +148,7 @@ const Chat = ({
   const showThinkingText = settingsStore((s) => s.showThinkingText)
   const [isLocalExpanded, setIsLocalExpanded] = useState(false)
   const isThinkingExpanded = showThinkingText || isLocalExpanded
-  const emotionPattern = new RegExp(`\\[(${EMOTIONS.join('|')})\\]\\s*`, 'gi')
-  const processedMessage = message
-    .replace(emotionPattern, '')
-    .replace(/\[motion:[^\]]*\]\s*/gi, '')
+  const processedMessage = stripSpeakControlTags(message)
 
   const roleColor =
     role !== 'user' ? 'bg-secondary text-theme ' : 'bg-base-light text-primary'

@@ -80,6 +80,19 @@ export function extractSentenceStyleBertVits2(
     return { sentence: '', remainingText: '' }
   }
 
+  const inlineControl = text.search(/\[(?:laugh|stunt|motion|bg):[^\]]+\]/i)
+  if (inlineControl > 0) {
+    const before = text.slice(0, inlineControl)
+    const after = text.slice(inlineControl)
+    const split = extractSentenceStyleBertVits2(before)
+    if (split.sentence) {
+      return {
+        sentence: split.sentence,
+        remainingText: [split.remainingText, after].filter(Boolean).join(' ').trim(),
+      }
+    }
+  }
+
   let firstSentenceEnd = -1
 
   for (let i = 0; i < text.length; i++) {

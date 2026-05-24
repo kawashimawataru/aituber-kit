@@ -1,7 +1,8 @@
 /**
- * pixi-live2d-display-lipsyncpatch (cubism4) が要求する Cubism Core 4.x との互換チェック。
- * Cubism 5/6 の live2dcubismcore.min.js では getDrawableRenderOrders が undefined になり
- * CubismRenderer_WebGL.doDrawModel で reading '0' が発生する。
+ * untitled-pixi-live2d-engine (cubism) が要求する Cubism Core との互換チェック。
+ * Cubism Core 4.x / 5.x 以降に対応。
+ * - Core 4.x → Cubism 4 以下のモデル (.moc3) を描画可能
+ * - Core 5.x → Cubism 5 以下のモデル (.moc5 / .moc3) を描画可能
  */
 
 export type CubismCoreCheckResult = {
@@ -47,20 +48,7 @@ export function checkCubismCoreCompatibility(): CubismCoreCheckResult {
     `[Live2D] Cubism Core ${major}.${minor}.${patch} (raw=${raw})`
   )
 
-  // cubism4 ビルドは Core 4.x 系のみ対応（5/6 は Framework API 不一致）
-  if (major >= 5) {
-    return {
-      ok: false,
-      major,
-      minor,
-      patch,
-      message:
-        `Cubism Core ${major}.${minor}.${patch} はこのアプリと非互換です。` +
-        'Live2D公式の「Cubism SDK for Web 4」（Core 4.x）から live2dcubismcore.min.js を取得し、' +
-        'public/scripts/ に置き換えてください。Cubism 5/6 の Core は使用できません。',
-    }
-  }
-
+  // Cubism Core 4.x 以上に対応（3.x は未検証のため拒否）
   if (major < 4) {
     return {
       ok: false,
@@ -68,9 +56,13 @@ export function checkCubismCoreCompatibility(): CubismCoreCheckResult {
       minor,
       patch,
       message:
-        `Cubism Core ${major}.${minor}.${patch} は古すぎます。Cubism SDK for Web 4 の Core を使用してください。`,
+        `Cubism Core ${major}.${minor}.${patch} は古すぎます。` +
+        'Cubism SDK for Web 4 または 5 の live2dcubismcore.min.js を使用してください。',
     }
   }
 
+  // Cubism 4 / 5 以降を許可
+  // - Core 4.x: Cubism 4 以下のモデル (.moc3) に対応
+  // - Core 5.x+: Cubism 5 以下のモデル (.moc5 / .moc3) に対応
   return { ok: true, major, minor, patch }
 }

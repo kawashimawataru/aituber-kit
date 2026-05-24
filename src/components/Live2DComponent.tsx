@@ -1,11 +1,14 @@
-import { Application, Ticker, DisplayObject } from 'pixi.js'
+import { Application, Ticker, Container, extensions } from 'pixi.js'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Live2DModel } from 'pixi-live2d-display-lipsyncpatch/cubism4'
+import { Live2DModel, Live2DPlugin } from 'untitled-pixi-live2d-engine/cubism'
 import homeStore from '@/features/stores/home'
 import settingsStore from '@/features/stores/settings'
 import { Live2DHandler } from '@/features/messages/live2dHandler'
 import { debounce } from 'lodash'
 import toastStore from '@/features/stores/toast'
+
+// Register the Live2D render pipe with PixiJS (must happen before Application.init)
+extensions.add(Live2DPlugin)
 
 console.log('Live2DComponent module loaded')
 
@@ -104,7 +107,7 @@ const Live2DComponent = (): JSX.Element => {
     }
   }, [model, app, fixPosition, unfixPosition, resetPosition, saveModelPosition])
 
-  const initApp = () => {
+  const initApp = async () => {
     if (!canvasContainerRef.current) return
 
     // Ensure canvas has valid dimensions for WebGL context creation
@@ -112,12 +115,14 @@ const Live2DComponent = (): JSX.Element => {
     const height = window.innerHeight || 1
 
     try {
-      const app = new Application({
+      const app = new Application()
+      await app.init({
         width,
         height,
-        view: canvasContainerRef.current,
+        canvas: canvasContainerRef.current,
         backgroundAlpha: 0,
         antialias: true,
+        preference: 'webgl',
       })
 
       appRef.current = app
@@ -148,7 +153,7 @@ const Live2DComponent = (): JSX.Element => {
         autoFocus: false,
       })
 
-      currentApp.stage.addChild(newModel as unknown as DisplayObject)
+      currentApp.stage.addChild(newModel as unknown as Container)
       newModel.anchor.set(0.5, 0.5)
       setModelPosition(currentApp, newModel)
 
@@ -192,11 +197,8 @@ const Live2DComponent = (): JSX.Element => {
         modelRef.current = null
       }
       if (appRef.current) {
-        appRef.current.destroy(true, {
-          children: true,
-          texture: true,
-          baseTexture: true,
-        })
+        // pixi v8: first arg = renderer destroy options, second = stage destroy options
+        appRef.current.destroy(true, { children: true, texture: true })
         appRef.current = null
       }
       setApp(null)
@@ -208,7 +210,7 @@ const Live2DComponent = (): JSX.Element => {
     if (app?.stage && selectedLive2DPath) {
       // 既存のモデルがある場合は先に削除
       if (modelRef.current) {
-        app.stage.removeChild(modelRef.current as unknown as DisplayObject)
+        app.stage.removeChild(modelRef.current as unknown as Container)
         modelRef.current.destroy()
         modelRef.current = null
         setModel(null)

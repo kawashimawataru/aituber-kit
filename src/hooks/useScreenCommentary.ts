@@ -4,13 +4,16 @@ import homeStore from '@/features/stores/home'
 import { captureFrameFromVideo, computeFrameDiff } from '@/features/vision/screenCapture'
 import { generateScreenCommentary } from '@/features/vision/screenCommentator'
 import { updateSituation } from '@/features/chat/situationModel'
+import { messageSelectors } from '@/features/messages/messageSelectors'
+import { sanitizeVisionCommentaryText } from '@/utils/speakControlTags'
 
 /**
  * 画面実況フック
  * - captureStatus が true（画面共有中）かつ screenCommentaryEnabled が true のとき動作
- * - screenCommentaryInterval 秒ごとにフレームをキャプチャ
+ * - screenCommentaryInterval 秒ごとにフレームをキャプチャ（起動直後も即実行）
  * - 前フレームとの差分が screenCommentaryThreshold 以上のときのみ LLM に送信
- * - 生成した実況コメントを handleSendChat と同じフローに乗せる
+ * - AI設定・システムプロンプト・会話履歴を Vision LLM に渡してコンテキスト付き実況を生成
+ * - 生成した実況コメントは直接 TTS 発話（handleSendChat 経由の二重 LLM なし）
  */
 export function useScreenCommentary(
   onCommentaryGenerated: (text: string, emotion: string) => void
@@ -27,7 +30,7 @@ export function useScreenCommentary(
       const ss = settingsStore.getState()
       const hs = homeStore.getState()
 
-      // AI発話中・チャット処理中は実況しない（割り込み防止）
+      // 発話中・AI処理中は実況しない（TTS キューの衝突を防ぐ）
       if (hs.isSpeaking || hs.chatProcessing) return
 
       const frame = captureFrameFromVideo(videoEl)
@@ -35,17 +38,35 @@ export function useScreenCommentary(
       // 差分チェック
       if (lastFrameRef.current) {
         const diff = await computeFrameDiff(lastFrameRef.current, frame)
-        // 状況モデルに画面変化スコアを反映
         updateSituation({ screenChangeScore: diff })
         if (diff < ss.screenCommentaryThreshold) return
       }
 
       lastFrameRef.current = frame
 
-      const result = await generateScreenCommentary(
-        frame,
-        ss.screenCommentaryPrompt || undefined
-      )
+      // 会話履歴（テキストのみ、直近 6 件）
+      const chatLog = homeStore.getState().chatLog
+      const recentMessages = messageSelectors
+        .cutImageMessage(chatLog.slice(-6))
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({
+          role: m.role as 'user' | 'assistant',
+          content: sanitizeVisionCommentaryText(
+            typeof m.content === 'string' ? m.content : ''
+          ),
+        }))
+        .filter((m) => m.content)
+
+      // AI設定を UI 設定から取得
+      const aiOptions = buildAiOptions(ss)
+
+      const result = await generateScreenCommentary(frame, {
+        ...aiOptions,
+        customPrompt: ss.screenCommentaryPrompt || undefined,
+        maxTokens: ss.screenCommentaryMaxTokens,
+        systemPrompt: ss.systemPrompt || undefined,
+        chatHistory: recentMessages,
+      })
 
       if (result.text) {
         onCommentaryGenerated(result.text, result.emotion)
@@ -65,27 +86,30 @@ export function useScreenCommentary(
       }
     }
 
+    const tryCapture = () => {
+      const hs = homeStore.getState()
+      if (!hs.captureStatus) return
+
+      const video = document.querySelector<HTMLVideoElement>(
+        'video[data-screen-capture]'
+      )
+      if (!video || video.readyState < 2) return
+
+      capture(video)
+    }
+
     const start = () => {
       cleanup()
 
       const ss = settingsStore.getState()
       const intervalMs = ss.screenCommentaryInterval * 1000
 
-      intervalRef.current = setInterval(() => {
-        const hs = homeStore.getState()
-        if (!hs.captureStatus) return
+      // 起動直後に即キャプチャ（30秒待ちを解消）
+      tryCapture()
 
-        // DOM から video 要素を取得（capture.tsx がレンダリングしたもの）
-        const video = document.querySelector<HTMLVideoElement>(
-          'video[data-screen-capture]'
-        )
-        if (!video || video.readyState < 2) return
-
-        capture(video)
-      }, intervalMs)
+      intervalRef.current = setInterval(tryCapture, intervalMs)
     }
 
-    // settingsStore の変化を購読
     const unsubscribe = settingsStore.subscribe((state, prev) => {
       const enabledChanged = state.screenCommentaryEnabled !== prev.screenCommentaryEnabled
       const intervalChanged = state.screenCommentaryInterval !== prev.screenCommentaryInterval
@@ -99,7 +123,6 @@ export function useScreenCommentary(
       }
     })
 
-    // 初期状態でONなら開始
     if (settingsStore.getState().screenCommentaryEnabled) {
       start()
     }
@@ -109,4 +132,36 @@ export function useScreenCommentary(
       unsubscribe()
     }
   }, [capture])
+}
+
+/**
+ * settingsStore の AI 設定を CommentaryOptions 形式に変換する
+ */
+function buildAiOptions(ss: ReturnType<typeof settingsStore.getState>) {
+  const service = ss.selectAIService as string
+
+  const keyMap: Record<string, string> = {
+    openai: ss.openaiKey,
+    anthropic: ss.anthropicKey,
+    google: ss.googleKey,
+    azure: ss.azureKey,
+    xai: ss.xaiKey,
+    groq: ss.groqKey,
+    cohere: ss.cohereKey,
+    mistralai: ss.mistralaiKey,
+    perplexity: ss.perplexityKey,
+    fireworks: ss.fireworksKey,
+    deepseek: ss.deepseekKey,
+    openrouter: ss.openrouterKey,
+    lmstudio: ss.lmstudioKey,
+    ollama: ss.ollamaKey,
+  }
+
+  return {
+    aiService: service,
+    model: ss.selectAIModel,
+    apiKey: keyMap[service] || '',
+    localLlmUrl: ss.localLlmUrl || '',
+    azureEndpoint: ss.azureEndpoint || '',
+  }
 }

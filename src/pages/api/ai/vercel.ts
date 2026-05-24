@@ -18,7 +18,7 @@ import { pipeResponse } from '@/utils/pipeResponse'
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '10mb',
+      sizeLimit: '15mb',
     },
   },
 }

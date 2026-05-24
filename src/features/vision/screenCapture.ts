@@ -11,7 +11,7 @@ const CAPTURE_HEIGHT = 720
  */
 export function captureFrameFromVideo(
   video: HTMLVideoElement,
-  quality = 0.7
+  quality = 0.75
 ): string {
   const canvas = document.createElement('canvas')
   canvas.width = CAPTURE_WIDTH

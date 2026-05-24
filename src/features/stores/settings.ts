@@ -275,6 +275,7 @@ interface General {
   screenCommentaryInterval: number
   screenCommentaryThreshold: number
   screenCommentaryPrompt: string
+  screenCommentaryMaxTokens: number
   // Phase 4: 共演配信モード
   coStreamingMode: boolean
   coStreamerName: string
@@ -680,6 +681,7 @@ const getInitialValuesFromEnv = (): SettingsState => ({
   screenCommentaryInterval: 30,
   screenCommentaryThreshold: 0.05,
   screenCommentaryPrompt: '',
+  screenCommentaryMaxTokens: 150,
   coStreamingMode:
     process.env.NEXT_PUBLIC_CO_STREAMING_MODE === 'true' || false,
   coStreamerName: process.env.NEXT_PUBLIC_CO_STREAMER_NAME || '',
@@ -1142,6 +1144,7 @@ const settingsStore = create<SettingsState>()(
         screenCommentaryInterval: state.screenCommentaryInterval,
         screenCommentaryThreshold: state.screenCommentaryThreshold,
         screenCommentaryPrompt: state.screenCommentaryPrompt,
+        screenCommentaryMaxTokens: state.screenCommentaryMaxTokens,
         coStreamingMode: state.coStreamingMode,
         coStreamerName: state.coStreamerName,
         backgroundChangeEnabled: state.backgroundChangeEnabled,

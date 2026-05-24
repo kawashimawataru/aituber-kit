@@ -75,8 +75,8 @@ export default function Live2DViewer() {
         <p className="font-semibold">Live2D Cubism Core のバージョンが合いません</p>
         <p className="mt-2 whitespace-pre-wrap">{cubismCoreError}</p>
         <p className="mt-3 text-xs text-red-800">
-          取得先: Live2D公式 → Cubism SDK for Web 4 → 解凍後の Core/
-          live2dcubismcore.min.js を public/scripts/ に配置（Cubism 5/6 の Core は不可）
+          取得先: Live2D公式 → Cubism SDK for Web 4 または 5 → 解凍後の Core/
+          live2dcubismcore.min.js を public/scripts/ に配置
         </p>
       </div>
     )

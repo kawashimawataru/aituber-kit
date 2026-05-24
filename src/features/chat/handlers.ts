@@ -1,5 +1,5 @@
 import { getAIChatResponseStream } from '@/features/chat/aiChatFactory'
-import { Message, EmotionType } from '@/features/messages/messages'
+import { Message, EmotionType, EMOTIONS } from '@/features/messages/messages'
 import { speakCharacter } from '@/features/messages/speakCharacter'
 import { judgeSlide } from '@/features/slide/slideAIHelpers'
 import homeStore from '@/features/stores/home'
@@ -36,6 +36,8 @@ import {
   isInvalidStandaloneTtsUnit,
 } from '@/utils/ttsSentenceSplit'
 import { sbv2SpeakBatcher } from '@/features/messages/sbv2SpeakBatcher'
+import { compressImageDataUrl } from '@/utils/compressImageForApi'
+import { stripSpeakControlTags } from '@/utils/speakControlTags'
 
 // セッションIDを生成する関数
 const generateSessionId = () => generateMessageId()
@@ -137,6 +139,21 @@ const askAIForMultiModalDecision = async (
   }
 }
 
+const NON_EMOTION_TAG_PREFIX = /^(motion:|stunt:|laugh:|bg:)/i
+
+/**
+ * 文中の laugh / stunt タグで SE・演出を発火してから TTS 用にタグ除去
+ */
+function prepareSentenceForSpeech(sentence: string): string {
+  for (const m of sentence.matchAll(/\[laugh:(short|medium|big)\]/gi)) {
+    void playLaughSE(m[1].toLowerCase() as 'short' | 'medium' | 'big')
+  }
+  for (const m of sentence.matchAll(/\[stunt:([a-z_]+)\]/gi)) {
+    void fireStunt(m[1] as StuntId)
+  }
+  return stripSpeakControlTags(sentence)
+}
+
 /**
  * テキストから感情タグ `[...]` を抽出する
  * @param text 入力テキスト
@@ -145,16 +162,17 @@ const askAIForMultiModalDecision = async (
 const extractEmotion = (
   text: string
 ): { emotionTag: string; remainingText: string } => {
-  // 先頭のスペースを無視して、感情タグを検出
   const emotionMatch = text.match(/^\s*\[(.*?)\]/)
   if (emotionMatch?.[0]) {
-    // モーションタグは感情タグとして扱わない
-    if (/^\s*\[motion:/i.test(text)) {
+    const inner = emotionMatch[1].trim()
+    if (NON_EMOTION_TAG_PREFIX.test(inner)) {
+      return { emotionTag: '', remainingText: text }
+    }
+    if (!EMOTIONS.includes(inner.toLowerCase() as EmotionType)) {
       return { emotionTag: '', remainingText: text }
     }
     return {
-      emotionTag: emotionMatch[0].trim(), // タグ自体の前後のスペースは除去
-      // 先頭のスペースも含めて削除し、さらに前後のスペースを除去
+      emotionTag: emotionMatch[0].trim(),
       remainingText: text
         .slice(text.indexOf(emotionMatch[0]) + emotionMatch[0].length)
         .trimStart(),
@@ -199,6 +217,40 @@ const extractStuntTag = (
     }
   }
   return { stuntId: '', remainingText: text }
+}
+
+/**
+ * 先頭の制御タグ（stunt / laugh / 未知タグ等）を処理してスキップ
+ */
+function advancePastLeadingControlTags(text: string): string {
+  let t = text.trimStart()
+  while (t.length > 0) {
+    const prev = t
+    const { motionTag, remainingText: afterMotion } = extractMotionTag(t)
+    if (motionTag) {
+      t = afterMotion
+      continue
+    }
+    const { stuntId, remainingText: afterStunt } = extractStuntTag(t)
+    if (stuntId) {
+      void fireStunt(stuntId as StuntId)
+      t = afterStunt
+      continue
+    }
+    const { laughType, remainingText: afterLaugh } = parseLaughTag(t)
+    if (laughType) {
+      void playLaughSE(laughType)
+      t = afterLaugh
+      continue
+    }
+    const unknown = t.match(/^\s*\[[a-zA-Z][a-zA-Z0-9_:]*\]/)
+    if (unknown) {
+      t = t.slice(unknown[0].length).trimStart()
+      continue
+    }
+    if (t === prev) break
+  }
+  return t
 }
 
 /**
@@ -255,13 +307,18 @@ const handleSpeakAndStateUpdate = (
   currentSlideMessagesRef: { current: string[] },
   motionTag?: string
 ) => {
+  sentence = prepareSentenceForSpeech(sentence)
+  if (!sentence) return false
+
   const hs = homeStore.getState()
   const emotion = emotionTag.includes('[')
     ? (emotionTag.slice(1, -1).toLowerCase() as EmotionType)
     : 'neutral'
 
   // 感情連動背景変更（backgroundChangeEnabled が ON の時のみ）
-  if (emotionTag) void applyEmotionBackground(emotionTag)
+  if (emotionTag && EMOTIONS.includes(emotion)) {
+    void applyEmotionBackground(emotionTag)
+  }
 
   // 発話不要/不可能な文字列だった場合はスキップ
   if (
@@ -390,6 +447,9 @@ export const speakMessageHandler = async (receivedMessage: string) => {
     if (processableText.length > 0) {
       let localRemaining = processableText.trimStart()
       while (localRemaining.length > 0) {
+        localRemaining = advancePastLeadingControlTags(localRemaining)
+        if (!localRemaining) break
+
         const prevLocalRemaining = localRemaining
         const { emotionTag, remainingText: textAfterEmotion } =
           extractEmotion(localRemaining)
@@ -406,34 +466,43 @@ export const speakMessageHandler = async (receivedMessage: string) => {
           extractSentence(textAfterBg)
 
         if (sentence) {
-          assistantMessageListRef.current.push(sentence)
-          const aiText = emotionTag ? `${emotionTag} ${sentence}` : sentence
-          accumulatedAssistantText += aiText + ' '
-          handleSpeakAndStateUpdate(
-            sessionId,
-            sentence,
-            emotionTag,
-            assistantMessageListRef,
-            currentSlideMessagesRef,
-            motionTag || undefined
-          )
-          localRemaining = textAfterSentence
-        } else {
-          if (localRemaining === prevLocalRemaining && localRemaining) {
-            const finalSentence = textAfterBg || localRemaining
-            assistantMessageListRef.current.push(finalSentence)
+          const spokenText = prepareSentenceForSpeech(sentence)
+          if (spokenText) {
+            assistantMessageListRef.current.push(spokenText)
             const aiText = emotionTag
-              ? `${emotionTag} ${finalSentence}`
-              : finalSentence
+              ? `${emotionTag} ${spokenText}`
+              : spokenText
             accumulatedAssistantText += aiText + ' '
             handleSpeakAndStateUpdate(
               sessionId,
-              finalSentence,
+              spokenText,
               emotionTag,
               assistantMessageListRef,
               currentSlideMessagesRef,
               motionTag || undefined
             )
+          }
+          localRemaining = textAfterSentence
+        } else {
+          if (localRemaining === prevLocalRemaining && localRemaining) {
+            const finalSentence = prepareSentenceForSpeech(
+              textAfterBg || localRemaining
+            )
+            if (finalSentence) {
+              assistantMessageListRef.current.push(finalSentence)
+              const aiText = emotionTag
+                ? `${emotionTag} ${finalSentence}`
+                : finalSentence
+              accumulatedAssistantText += aiText + ' '
+              handleSpeakAndStateUpdate(
+                sessionId,
+                finalSentence,
+                emotionTag,
+                assistantMessageListRef,
+                currentSlideMessagesRef,
+                motionTag || undefined
+              )
+            }
             localRemaining = ''
           } else {
             localRemaining = textAfterSentence
@@ -448,16 +517,18 @@ export const speakMessageHandler = async (receivedMessage: string) => {
             'Potential infinite loop detected in speakMessageHandler, breaking. Remaining:',
             localRemaining
           )
-          const finalSentence = localRemaining
-          assistantMessageListRef.current.push(finalSentence)
-          accumulatedAssistantText += finalSentence + ' '
-          handleSpeakAndStateUpdate(
-            sessionId,
-            finalSentence,
-            '',
-            assistantMessageListRef,
-            currentSlideMessagesRef
-          )
+          const finalSentence = prepareSentenceForSpeech(localRemaining)
+          if (finalSentence) {
+            assistantMessageListRef.current.push(finalSentence)
+            accumulatedAssistantText += finalSentence + ' '
+            handleSpeakAndStateUpdate(
+              sessionId,
+              finalSentence,
+              '',
+              assistantMessageListRef,
+              currentSlideMessagesRef
+            )
+          }
           break
         }
       }
@@ -686,6 +757,11 @@ export const processAIResponse = async (messages: Message[]) => {
             //
             let textToProcessBeforeCode = beforeCode.trimStart()
             while (textToProcessBeforeCode.length > 0) {
+              textToProcessBeforeCode = advancePastLeadingControlTags(
+                textToProcessBeforeCode
+              )
+              if (!textToProcessBeforeCode) break
+
               const prevText = textToProcessBeforeCode
               const {
                 emotionTag: extractedEmotion,
@@ -944,7 +1020,10 @@ export const handleSendChatFn =
     const ss = settingsStore.getState()
     const sls = slideStore.getState()
     const wsManager = webSocketStore.getState().wsManager
-    const modalImage = homeStore.getState().modalImage
+    const rawModalImage = homeStore.getState().modalImage
+    const modalImage = rawModalImage
+      ? await compressImageDataUrl(rawModalImage)
+      : ''
 
     if (ss.externalLinkageMode) {
       homeStore.setState({ chatProcessing: true })

@@ -165,6 +165,13 @@ describe('speakCharacter', () => {
           settingsStore.getState()
         )
       ).toBe('ケツバトラー？えー、ごめん、知らないなー！何それ？')
+
+      expect(
+        preprocessMessage(
+          '[stunt:lean_in]わーい！[laugh:short] 最近何か美味しいもの食べた？[curious]',
+          settingsStore.getState()
+        )
+      ).toBe('わーい！ 最近何か美味しいもの食べた？')
     })
   })
 

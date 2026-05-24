@@ -25,6 +25,12 @@ jest.mock('../../../components/slides', () => ({
   goToSlide: jest.fn(),
 }))
 
+jest.mock('@/utils/compressImageForApi', () => ({
+  compressImageDataUrl: jest.fn((url: string) => Promise.resolve(url)),
+  calculateScaledDimensions: jest.requireActual('@/utils/compressImageForApi')
+    .calculateScaledDimensions,
+}))
+
 jest.mock('../../../features/stores/home', () => ({
   getState: jest.fn(),
   setState: jest.fn(),

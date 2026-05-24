@@ -11,24 +11,20 @@ import { sanitizeVisionCommentaryText } from '@/utils/speakControlTags'
  * - 生成したコメントは handleSendChat（二重 LLM）を経由せず直接 TTS 発話する
  */
 function ScreenCommentaryManager(): null {
-  const onCommentaryGenerated = useCallback(
-    (text: string, emotion: string) => {
-      // 二重チェック: 発話中/処理中なら捨てる
-      const hs = homeStore.getState()
-      if (hs.isSpeaking || hs.chatProcessing) return
+  const onCommentaryGenerated = useCallback((text: string, emotion: string) => {
+    // 二重チェック: 発話中/処理中なら捨てる
+    const hs = homeStore.getState()
+    if (hs.isSpeaking || hs.chatProcessing) return
 
-      const plainText = sanitizeVisionCommentaryText(text)
-      if (!plainText) return
+    const plainText = sanitizeVisionCommentaryText(text)
+    if (!plainText) return
 
-      // 感情は JSON の emotion フィールドのみ（text 内タグは使わない）
-      const emotionTag =
-        emotion && emotion !== 'neutral' ? `[${emotion}]` : ''
-      const message = emotionTag ? `${emotionTag}${plainText}` : plainText
+    // 感情は JSON の emotion フィールドのみ（text 内タグは使わない）
+    const emotionTag = emotion && emotion !== 'neutral' ? `[${emotion}]` : ''
+    const message = emotionTag ? `${emotionTag}${plainText}` : plainText
 
-      void speakMessageHandler(message)
-    },
-    []
-  )
+    void speakMessageHandler(message)
+  }, [])
 
   useScreenCommentary(onCommentaryGenerated)
 

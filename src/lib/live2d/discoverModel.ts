@@ -117,7 +117,10 @@ export async function discoverLive2DModelsInRoot(
         try {
           const mocBuf = await fs.readFile(mocFullPath)
           // 5th byte (index 4) encodes moc version: 1=Cubism3.0, 2=Cubism3.3, 3=Cubism4.0, 4=Cubism4.2, 5=Cubism5.0
-          if (mocBuf.length > 4 && mocBuf.slice(0, 4).toString('ascii') === 'MOC3') {
+          if (
+            mocBuf.length > 4 &&
+            mocBuf.slice(0, 4).toString('ascii') === 'MOC3'
+          ) {
             mocVersion = mocBuf[4]
           }
         } catch {

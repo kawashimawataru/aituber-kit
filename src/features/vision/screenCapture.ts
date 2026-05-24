@@ -56,7 +56,7 @@ export function computeFrameDiff(a: string, b: string): Promise<number> {
 
       let diff = 0
       for (let i = 0; i < dataA.length; i += 4) {
-        diff += Math.abs(dataA[i] - dataB[i])       // R
+        diff += Math.abs(dataA[i] - dataB[i]) // R
         diff += Math.abs(dataA[i + 1] - dataB[i + 1]) // G
         diff += Math.abs(dataA[i + 2] - dataB[i + 2]) // B
       }

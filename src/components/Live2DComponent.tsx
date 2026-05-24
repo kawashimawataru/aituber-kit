@@ -141,7 +141,7 @@ const Live2DComponent = (): JSX.Element => {
     if (!(window as any).Live2DCubismCore) {
       console.error(
         '[Live2D] window.Live2DCubismCore is not defined. ' +
-        'Place live2dcubismcore.min.js at public/scripts/live2dcubismcore.min.js'
+          'Place live2dcubismcore.min.js at public/scripts/live2dcubismcore.min.js'
       )
       return
     }
@@ -167,8 +167,7 @@ const Live2DComponent = (): JSX.Element => {
     } catch (error) {
       console.error('[Live2D] Failed to load model:', modelPath, error)
       homeStore.setState({ live2dViewer: null })
-      const msg =
-        error instanceof Error ? error.message : String(error)
+      const msg = error instanceof Error ? error.message : String(error)
       toastStore.getState().addToast({
         message: `Live2Dモデルの読み込みに失敗しました: ${msg}`,
         type: 'error',

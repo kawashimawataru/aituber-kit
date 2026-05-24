@@ -44,7 +44,11 @@ export default async function handler(
   try {
     const [, files] = await form.parse(req)
     const uploaded = files.files
-    const fileList = Array.isArray(uploaded) ? uploaded : uploaded ? [uploaded] : []
+    const fileList = Array.isArray(uploaded)
+      ? uploaded
+      : uploaded
+        ? [uploaded]
+        : []
 
     if (fileList.length === 0) {
       return res.status(400).json({ error: 'No files uploaded' })

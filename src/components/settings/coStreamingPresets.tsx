@@ -81,7 +81,9 @@ const CoStreamingPresets = () => {
 
   return (
     <div className="my-6">
-      <div className="my-2 text-xl font-bold">{t('CoStreamingPresetsTitle')}</div>
+      <div className="my-2 text-xl font-bold">
+        {t('CoStreamingPresetsTitle')}
+      </div>
       <div className="my-2 text-sm">{t('CoStreamingPresetsInfo')}</div>
       <div className="flex flex-col gap-2 mt-4">
         {PRESETS.map((preset) => (

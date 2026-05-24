@@ -7,7 +7,9 @@ const CoStreamingSettings = () => {
   const { t } = useTranslation()
   const coStreamingMode = settingsStore((s) => s.coStreamingMode)
   const coStreamerName = settingsStore((s) => s.coStreamerName)
-  const backgroundChangeEnabled = settingsStore((s) => s.backgroundChangeEnabled)
+  const backgroundChangeEnabled = settingsStore(
+    (s) => s.backgroundChangeEnabled
+  )
 
   return (
     <div className="my-10">

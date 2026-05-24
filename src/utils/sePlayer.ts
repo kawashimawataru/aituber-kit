@@ -13,10 +13,7 @@ function getAudioContext(): AudioContext {
   return audioCtx
 }
 
-export async function playSE(
-  path: string,
-  volume = 1.0
-): Promise<void> {
+export async function playSE(path: string, volume = 1.0): Promise<void> {
   try {
     const ctx = getAudioContext()
 
@@ -47,9 +44,7 @@ export async function playSE(
  * 笑いタイプに対応するSEパスを返す
  * ファイルがない場合は null
  */
-export function getLaughSEPath(
-  type: 'short' | 'medium' | 'big'
-): string {
+export function getLaughSEPath(type: 'short' | 'medium' | 'big'): string {
   return `/assets/reactions/laugh_${type}.wav`
 }
 

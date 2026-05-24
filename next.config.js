@@ -3,6 +3,7 @@ const isRestrictedMode = process.env.NEXT_PUBLIC_RESTRICTED_MODE === 'true'
 
 const nextConfig = {
   reactStrictMode: true,
+  transpilePackages: ['untitled-pixi-live2d-engine'],
   assetPrefix: process.env.BASE_PATH || '',
   basePath: process.env.BASE_PATH || '',
   trailingSlash: true,

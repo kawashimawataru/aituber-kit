@@ -278,7 +278,7 @@ description, based, character, ai, voice, speechInput, youtube, slide, images, m
 
 1. **[docs/dev-log/STATUS.md](docs/dev-log/STATUS.md)** — 現在の Phase・次タスク・ブロッカー
 2. **[docs/project/README.md](docs/project/README.md)** — ワークフロー・ドキュメントマップ
-3. 対象 **[docs/project/phases/phase-*.md](docs/project/phases/)** — 実装するタスク ID
+3. 対象 **[docs/project/phases/phase-\*.md](docs/project/phases/)** — 実装するタスク ID
 4. 終了時: **`docs/dev-log/YYYY-MM-DD.md`** に記録し **STATUS.md を更新**
 
 ### ディレクトリ

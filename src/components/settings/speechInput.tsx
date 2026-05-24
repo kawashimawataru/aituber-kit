@@ -73,9 +73,7 @@ const SpeechInput = () => {
               }
               disabled={isSpeechModeSwitchDisabled}
               className={
-                speechRecognitionMode === mode
-                  ? 'opacity-100'
-                  : 'opacity-50'
+                speechRecognitionMode === mode ? 'opacity-100' : 'opacity-50'
               }
             >
               {mode === 'browser'
@@ -178,15 +176,15 @@ const SpeechInput = () => {
             />
           </div>
           <div className="my-6">
-            <div className="my-4 text-xl font-bold">{t('DeepgramAutoSend')}</div>
+            <div className="my-4 text-xl font-bold">
+              {t('DeepgramAutoSend')}
+            </div>
             <div className="my-2 text-sm whitespace-pre-wrap">
               {t('DeepgramAutoSendInfo')}
             </div>
             <ToggleSwitch
               enabled={deepgramAutoSend}
-              onChange={(v) =>
-                settingsStore.setState({ deepgramAutoSend: v })
-              }
+              onChange={(v) => settingsStore.setState({ deepgramAutoSend: v })}
             />
           </div>
           <div className="my-6">

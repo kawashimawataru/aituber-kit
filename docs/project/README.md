@@ -47,33 +47,33 @@ flowchart LR
 
 ### 4. 計画書の更新タイミング
 
-| 変更の種類 | 更新先 |
-|-----------|--------|
-| タスク完了 | dev-log + STATUS のみ |
-| タスク追加・優先度変更 | 該当 `phases/phase-*.md` + dev-log |
+| 変更の種類                  | 更新先                                        |
+| --------------------------- | --------------------------------------------- |
+| タスク完了                  | dev-log + STATUS のみ                         |
+| タスク追加・優先度変更      | 該当 `phases/phase-*.md` + dev-log            |
 | 調査結果（実装済み/未実装） | [current-state.md](current-state.md) + matrix |
-| 方針転換 | [vision.md](vision.md) + dev-log |
+| 方針転換                    | [vision.md](vision.md) + dev-log              |
 
 ---
 
 ## ドキュメントマップ
 
-| ファイル | 内容 |
-|----------|------|
-| [vision.md](vision.md) | ビジョン・Neuro 方向の軸 |
-| [architecture.md](architecture.md) | 概念アーキテクチャ・設計原則 |
-| [current-state.md](current-state.md) | 既存機能・pngtuber 参考・体傾け/背景調査 |
-| [matrix.md](matrix.md) | 機能マトリクス（計画 vs 現状） |
-| [glossary.md](glossary.md) | 用語集 |
-| [risks.md](risks.md) | リスクと対策 |
-| [out-of-scope.md](out-of-scope.md) | 当面やらないこと |
-| [reference/idle-mode.md](reference/idle-mode.md) | アイドルモードの説明 |
-| [co-streaming-preset.md](co-streaming-preset.md) | 共演プリセット A/B/C の詳細・タグ構文リファレンス |
-| [obs-streaming-guide.md](obs-streaming-guide.md) | OBS シーン構成・音声ルーティング・ブラウザソース設定 |
-| [onecomme-guide.md](onecomme-guide.md) | わんコメ連携設定・共演モード挙動・トラブルシューティング |
-| [e2e-youtube-checklist.md](e2e-youtube-checklist.md) | YouTube 共演配信 E2E チェックリスト |
+| ファイル                                             | 内容                                                          |
+| ---------------------------------------------------- | ------------------------------------------------------------- |
+| [vision.md](vision.md)                               | ビジョン・Neuro 方向の軸                                      |
+| [architecture.md](architecture.md)                   | 概念アーキテクチャ・設計原則                                  |
+| [current-state.md](current-state.md)                 | 既存機能・pngtuber 参考・体傾け/背景調査                      |
+| [matrix.md](matrix.md)                               | 機能マトリクス（計画 vs 現状）                                |
+| [glossary.md](glossary.md)                           | 用語集                                                        |
+| [risks.md](risks.md)                                 | リスクと対策                                                  |
+| [out-of-scope.md](out-of-scope.md)                   | 当面やらないこと                                              |
+| [reference/idle-mode.md](reference/idle-mode.md)     | アイドルモードの説明                                          |
+| [co-streaming-preset.md](co-streaming-preset.md)     | 共演プリセット A/B/C の詳細・タグ構文リファレンス             |
+| [obs-streaming-guide.md](obs-streaming-guide.md)     | OBS シーン構成・音声ルーティング・ブラウザソース設定          |
+| [onecomme-guide.md](onecomme-guide.md)               | わんコメ連携設定・共演モード挙動・トラブルシューティング      |
+| [e2e-youtube-checklist.md](e2e-youtube-checklist.md) | YouTube 共演配信 E2E チェックリスト                           |
 | [irodori-tts-migration.md](irodori-tts-migration.md) | **Irodori-TTS 移行計画**（SBV2 からの将来移行・ローカルパス） |
-| [phases/](phases/) | Phase 0〜6 のタスク・完了条件 |
+| [phases/](phases/)                                   | Phase 0〜6 のタスク・完了条件                                 |
 
 ---
 

@@ -26,7 +26,9 @@ export class Live2DErrorBoundary extends React.Component<Props, State> {
             public/scripts/live2dcubismcore.min.js を確認してください。
           </p>
           {this.state.message && (
-            <p className="mt-2 text-xs opacity-75 break-all">{this.state.message}</p>
+            <p className="mt-2 text-xs opacity-75 break-all">
+              {this.state.message}
+            </p>
           )}
         </div>
       )

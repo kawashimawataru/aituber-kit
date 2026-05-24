@@ -1,8 +1,10 @@
 /**
  * untitled-pixi-live2d-engine (cubism) が要求する Cubism Core との互換チェック。
- * Cubism Core 4.x / 5.x 以降に対応。
+ * 対応 Core: 4.x（SDK 4）/ 5.x（SDK 5 r.1〜r.4）
  * - Core 4.x → Cubism 4 以下のモデル (.moc3) を描画可能
- * - Core 5.x → Cubism 5 以下のモデル (.moc5 / .moc3) を描画可能
+ * - Core 5.x → Cubism 5 以下のモデル (.moc3) を描画可能
+ *
+ * ⚠️ SDK 5 r.5 以降 (Core 6.x) は drawables API が変わり非互換。SDK 5 r.4 を使うこと。
  */
 
 export type CubismCoreCheckResult = {
@@ -44,11 +46,22 @@ export function checkCubismCoreCompatibility(): CubismCoreCheckResult {
   const raw = core.Version.csmGetVersion()
   const { major, minor, patch } = parseCubismCoreVersion(raw)
 
-  console.info(
-    `[Live2D] Cubism Core ${major}.${minor}.${patch} (raw=${raw})`
-  )
+  console.info(`[Live2D] Cubism Core ${major}.${minor}.${patch} (raw=${raw})`)
 
-  // Cubism Core 4.x 以上に対応（3.x は未検証のため拒否）
+  // Core 6.x (SDK 5 r.5+) は drawables API が変わり非互換のため拒否
+  if (major >= 6) {
+    return {
+      ok: false,
+      major,
+      minor,
+      patch,
+      message:
+        `Cubism Core ${major}.${minor}.${patch} (SDK 5 r.5 以降) は非互換です。` +
+        'SDK 5 r.4 の live2dcubismcore.min.js を使用してください。',
+    }
+  }
+
+  // Core 4.x 以上を許可（3.x は未検証のため拒否）
   if (major < 4) {
     return {
       ok: false,
@@ -57,12 +70,9 @@ export function checkCubismCoreCompatibility(): CubismCoreCheckResult {
       patch,
       message:
         `Cubism Core ${major}.${minor}.${patch} は古すぎます。` +
-        'Cubism SDK for Web 4 または 5 の live2dcubismcore.min.js を使用してください。',
+        'Cubism SDK for Web 4 または 5 r.4 の live2dcubismcore.min.js を使用してください。',
     }
   }
 
-  // Cubism 4 / 5 以降を許可
-  // - Core 4.x: Cubism 4 以下のモデル (.moc3) に対応
-  // - Core 5.x+: Cubism 5 以下のモデル (.moc5 / .moc3) に対応
   return { ok: true, major, minor, patch }
 }

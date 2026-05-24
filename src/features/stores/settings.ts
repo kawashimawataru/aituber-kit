@@ -429,12 +429,10 @@ const getInitialValuesFromEnv = (): SettingsState => ({
     0.35,
   stylebertvits2Length:
     parseFloat(process.env.NEXT_PUBLIC_STYLEBERTVITS2_LENGTH || '1.0') || 1.0,
-  irodoriTtsServerUrl:
-    process.env.NEXT_PUBLIC_IRODORI_TTS_SERVER_URL || '',
+  irodoriTtsServerUrl: process.env.NEXT_PUBLIC_IRODORI_TTS_SERVER_URL || '',
   irodoriTtsApiKey: '',
   irodoriTtsVoice: process.env.NEXT_PUBLIC_IRODORI_TTS_VOICE || '',
-  irodoriTtsModel:
-    process.env.NEXT_PUBLIC_IRODORI_TTS_MODEL || 'irodori-tts',
+  irodoriTtsModel: process.env.NEXT_PUBLIC_IRODORI_TTS_MODEL || 'irodori-tts',
   irodoriTtsSpeed:
     parseFloat(process.env.NEXT_PUBLIC_IRODORI_TTS_SPEED || '1.0') || 1.0,
   irodoriTtsInjectEmotion:
@@ -689,8 +687,7 @@ const getInitialValuesFromEnv = (): SettingsState => ({
 
   bgmEnabled: process.env.NEXT_PUBLIC_BGM_ENABLED === 'true',
   bgmPath: process.env.NEXT_PUBLIC_BGM_PATH || '',
-  bgmVolume:
-    parseFloat(process.env.NEXT_PUBLIC_BGM_VOLUME || '0.35') || 0.35,
+  bgmVolume: parseFloat(process.env.NEXT_PUBLIC_BGM_VOLUME || '0.35') || 0.35,
   bgmDuckOnSpeech: process.env.NEXT_PUBLIC_BGM_DUCK_ON_SPEECH !== 'false',
   bgmDuckVolume:
     parseFloat(process.env.NEXT_PUBLIC_BGM_DUCK_VOLUME || '0.12') || 0.12,

@@ -521,9 +521,7 @@ export const MessageInput = ({
                   <ToggleSwitch
                     enabled={deepgramAutoSend}
                     disabled={chatProcessing}
-                    onChange={(enabled) =>
-                      onDeepgramAutoSendChange?.(enabled)
-                    }
+                    onChange={(enabled) => onDeepgramAutoSendChange?.(enabled)}
                   />
                 </label>
               )}

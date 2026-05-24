@@ -9,12 +9,12 @@ import {
 describe('ttsSentenceSplit', () => {
   describe('extractSentenceStyleBertVits2', () => {
     it('最初の句点までを1文として切り出す', () => {
-      expect(
-        extractSentenceStyleBertVits2('こんにちは。元気ですか。')
-      ).toEqual({
-        sentence: 'こんにちは。',
-        remainingText: '元気ですか。',
-      })
+      expect(extractSentenceStyleBertVits2('こんにちは。元気ですか。')).toEqual(
+        {
+          sentence: 'こんにちは。',
+          remainingText: '元気ですか。',
+        }
+      )
     })
 
     it('「」の途中では ! で切らない', () => {
@@ -24,12 +24,12 @@ describe('ttsSentenceSplit', () => {
     })
 
     it('「」が閉じたら1文にまとめる', () => {
-      expect(
-        extractSentenceStyleBertVits2('「ちょっと待って！」ね！')
-      ).toEqual({
-        sentence: '「ちょっと待って！」ね！',
-        remainingText: '',
-      })
+      expect(extractSentenceStyleBertVits2('「ちょっと待って！」ね！')).toEqual(
+        {
+          sentence: '「ちょっと待って！」ね！',
+          remainingText: '',
+        }
+      )
     })
 
     it('」だけの断片は単独送信しない', () => {
@@ -37,9 +37,7 @@ describe('ttsSentenceSplit', () => {
     })
 
     it('読点だけでは切らない（句点までバッファ）', () => {
-      expect(
-        extractSentenceStyleBertVits2('えーと、それは、')
-      ).toEqual({
+      expect(extractSentenceStyleBertVits2('えーと、それは、')).toEqual({
         sentence: '',
         remainingText: 'えーと、それは、',
       })

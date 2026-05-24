@@ -20,9 +20,9 @@ export interface StuntDef {
   id: StuntId
   // 画面シェイク設定
   shake?: {
-    intensity: number   // px
-    duration: number    // ms
-    count: number       // 振動回数
+    intensity: number // px
+    duration: number // ms
+    count: number // 振動回数
   }
   // 感情（表情先行: 音より 50-150ms 早く適用）
   emotion?: string

@@ -65,7 +65,9 @@ export default async function handler(
         : undefined
 
   try {
-    const stylebertvits2ServerUrl = resolveServerUrl(body.stylebertvits2ServerUrl)
+    const stylebertvits2ServerUrl = resolveServerUrl(
+      body.stylebertvits2ServerUrl
+    )
 
     if (stylebertvits2ServerUrl.includes('https://api.runpod.ai')) {
       const voice = await fetch(stylebertvits2ServerUrl, {
@@ -143,7 +145,10 @@ export default async function handler(
       body: JSON.stringify(postBody),
     })
 
-    if (!voice.ok && (voice.status === 405 || voice.status === 404 || voice.status === 422)) {
+    if (
+      !voice.ok &&
+      (voice.status === 405 || voice.status === 404 || voice.status === 422)
+    ) {
       const voiceUrlWithQuery = `${voiceEndpoint}?${queryParams}`
       voice = await fetch(voiceUrlWithQuery, {
         method: 'GET',

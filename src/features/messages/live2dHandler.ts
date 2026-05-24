@@ -150,7 +150,10 @@ export class Live2DHandler {
         return
       }
 
-      await Live2DHandler.playDecodedBuffer(audioContext, decoded as AudioBuffer)
+      await Live2DHandler.playDecodedBuffer(
+        audioContext,
+        decoded as AudioBuffer
+      )
     } finally {
       await audioContext.close().catch(() => undefined)
     }

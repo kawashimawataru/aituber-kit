@@ -82,7 +82,14 @@ export class PrefetchSpeakPipeline {
     }
 
     const index = this.synthSeq++
-    void this.runSynth(index, sessionId, talk, synthesize, initialToken, onComplete)
+    void this.runSynth(
+      index,
+      sessionId,
+      talk,
+      synthesize,
+      initialToken,
+      onComplete
+    )
   }
 
   private async runSynth(

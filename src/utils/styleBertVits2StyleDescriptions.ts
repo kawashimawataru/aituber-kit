@@ -8,10 +8,8 @@ const STYLE_DESCRIPTIONS: Record<string, string> = {
     '落ち着いた通常の声。ニュートラルでバランスの取れた読み上げ。日常会話・説明向き。',
   neutral:
     '落ち着いた通常の声。ニュートラルでバランスの取れた読み上げ。日常会話・説明向き。',
-  Happy:
-    '明るく弾む声。喜び・興奮・テンション高めのリアクション向き。',
-  happy:
-    '明るく弾む声。喜び・興奮・テンション高めのリアクション向き。',
+  Happy: '明るく弾む声。喜び・興奮・テンション高めのリアクション向き。',
+  happy: '明るく弾む声。喜び・興奮・テンション高めのリアクション向き。',
   Sad: '低めでしっとりした声。悲しみ・落ち込み・しんみりした場面向き。',
   sad: '低めでしっとりした声。悲しみ・落ち込み・しんみりした場面向き。',
   Angry: '強めでキレのある声。怒り・ツッコミ・ぷんぷんした反応向き。',
@@ -59,7 +57,9 @@ export function getStyleBertVits2StyleDescription(styleName: string): string {
 /**
  * ドロップダウン用の短いラベル（名前 — 要約）
  */
-export function formatStyleBertVits2StyleOptionLabel(styleName: string): string {
+export function formatStyleBertVits2StyleOptionLabel(
+  styleName: string
+): string {
   const desc = getStyleBertVits2StyleDescription(styleName)
   const short = desc.split('。')[0].slice(0, 28)
   return `${styleName} — ${short}${desc.length > short.length ? '…' : ''}`
@@ -73,7 +73,6 @@ export function formatSbv2ModelOptionLabel(
   modelId: string,
   speakers: string[]
 ): string {
-  const spk =
-    speakers.length > 0 ? ` / 話者: ${speakers.join(', ')}` : ''
+  const spk = speakers.length > 0 ? ` / 話者: ${speakers.join(', ')}` : ''
   return `${label} (ID: ${modelId})${spk}`
 }

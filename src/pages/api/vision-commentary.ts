@@ -71,11 +71,9 @@ export default async function handler(
   }
 
   // UI設定優先 → 環境変数フォールバック
-  const aiService = (
-    bodyAiService ||
+  const aiService = (bodyAiService ||
     process.env.NEXT_PUBLIC_SELECT_AI_SERVICE ||
-    'openai'
-  ) as VercelAIService
+    'openai') as VercelAIService
   const model =
     bodyModel || process.env.NEXT_PUBLIC_SELECT_AI_MODEL || 'gpt-4o-mini'
 
@@ -89,8 +87,10 @@ export default async function handler(
   // Azure: resourceName の抽出
   const resolvedAzureEndpoint =
     azureEndpoint || process.env.AZURE_ENDPOINT || ''
-  const azureResourceName = resolvedAzureEndpoint
-    .replace(/^https:\/\/|\.openai\.azure\.com.*$/g, '')
+  const azureResourceName = resolvedAzureEndpoint.replace(
+    /^https:\/\/|\.openai\.azure\.com.*$/g,
+    ''
+  )
   const azureDeployment =
     resolvedAzureEndpoint.match(/\/deployments\/([^/]+)/)?.[1] || ''
   const resolvedModel = aiService === 'azure' ? azureDeployment : model
@@ -164,7 +164,7 @@ export default async function handler(
       parsed = { text: rawText.trim(), emotion: 'neutral' }
     }
 
-  const sanitizedText = sanitizeVisionCommentaryText(parsed.text || '')
+    const sanitizedText = sanitizeVisionCommentaryText(parsed.text || '')
 
     return res.status(200).json({
       text: sanitizedText,

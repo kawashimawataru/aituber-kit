@@ -43,12 +43,7 @@ export const MessageInputContainer = ({ onChatProcessStart }: Props) => {
       }
 
       const hs = homeStore.getState()
-      if (
-        enabled &&
-        !isListening &&
-        !hs.isSpeaking &&
-        !hs.chatProcessing
-      ) {
+      if (enabled && !isListening && !hs.isSpeaking && !hs.chatProcessing) {
         await startListening()
       }
     },

@@ -1,9 +1,6 @@
 import { EMOTIONS } from '@/features/messages/messages'
 
-const EMOTION_TAG_PATTERN = new RegExp(
-  `\\[(?:${EMOTIONS.join('|')})\\]`,
-  'gi'
-)
+const EMOTION_TAG_PATTERN = new RegExp(`\\[(?:${EMOTIONS.join('|')})\\]`, 'gi')
 
 /** 独白・メタ用タグ（TTS・表示から除去） */
 const META_TAG_PATTERN =

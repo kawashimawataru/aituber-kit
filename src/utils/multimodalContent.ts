@@ -8,9 +8,7 @@ export function getTextFromMessageContent(
   if (typeof content === 'string') return content
   if (!Array.isArray(content) || !content[0]) return ''
   const first = content[0]
-  return typeof first === 'object' && first && 'text' in first
-    ? first.text
-    : ''
+  return typeof first === 'object' && first && 'text' in first ? first.text : ''
 }
 
 /** マルチモーダル content 配列から画像 URL を安全に取得 */

@@ -944,9 +944,7 @@ const Character = () => {
       const response = await fetch('/api/import-live2d-from-path', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          sourcePath ? { sourcePath } : {}
-        ),
+        body: JSON.stringify(sourcePath ? { sourcePath } : {}),
       })
       const data = await response.json()
       if (!response.ok) {
@@ -1204,10 +1202,9 @@ const Character = () => {
                   <option value="">{t('Live2D.NoModels')}</option>
                 )}
                 {live2dModels.map((model) => {
-                  const incompatible = model.mocVersion === 5
                   const versionLabel =
                     model.mocVersion === 5
-                      ? ' [Cubism5 非対応]'
+                      ? ' [Cubism5.0]'
                       : model.mocVersion === 4
                         ? ' [Cubism4.2]'
                         : model.mocVersion === 3
@@ -1218,11 +1215,7 @@ const Character = () => {
                               ? ' [Cubism3.0]'
                               : ''
                   return (
-                    <option
-                      key={model.path}
-                      value={model.path}
-                      disabled={incompatible}
-                    >
+                    <option key={model.path} value={model.path}>
                       {model.name}
                       {versionLabel}
                     </option>

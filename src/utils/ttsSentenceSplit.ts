@@ -41,9 +41,7 @@ export function isInvalidStandaloneTtsUnit(text: string): boolean {
     return true
   }
 
-  if (
-    /^[\s」』）)\]、,，.!?！？:：;；\-_~～'"''""]+$/.test(t)
-  ) {
+  if (/^[\s」』）)\]、,，.!?！？:：;；\-_~～'"''""]+$/.test(t)) {
     return true
   }
 
@@ -53,9 +51,10 @@ export function isInvalidStandaloneTtsUnit(text: string): boolean {
 /**
  * 従来の extractSentence（他エンジン・Irodori 等・低遅延向け）
  */
-export function extractSentenceDefault(
-  text: string
-): { sentence: string; remainingText: string } {
+export function extractSentenceDefault(text: string): {
+  sentence: string
+  remainingText: string
+} {
   const sentenceMatch = text.match(
     /^(.{1,19}?(?:[。．.!?！？\n]|(?=\[))|.{20,}?(?:[、,。．.!?！？\n]|(?=\[)))/
   )
@@ -73,9 +72,10 @@ export function extractSentenceDefault(
  * - 読点（、）では切らない
  * - 最初の句点（。！？）までを1塊（複数文は別 TTS + 再生間ポーズ）
  */
-export function extractSentenceStyleBertVits2(
-  text: string
-): { sentence: string; remainingText: string } {
+export function extractSentenceStyleBertVits2(text: string): {
+  sentence: string
+  remainingText: string
+} {
   if (!text) {
     return { sentence: '', remainingText: '' }
   }
@@ -88,7 +88,10 @@ export function extractSentenceStyleBertVits2(
     if (split.sentence) {
       return {
         sentence: split.sentence,
-        remainingText: [split.remainingText, after].filter(Boolean).join(' ').trim(),
+        remainingText: [split.remainingText, after]
+          .filter(Boolean)
+          .join(' ')
+          .trim(),
       }
     }
   }

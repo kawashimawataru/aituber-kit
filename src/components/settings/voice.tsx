@@ -642,9 +642,8 @@ const Voice = () => {
                 ? [stylebertvits2Style].filter(Boolean)
                 : ['Neutral']
 
-            const currentStyleDescription = getStyleBertVits2StyleDescription(
-              stylebertvits2Style
-            )
+            const currentStyleDescription =
+              getStyleBertVits2StyleDescription(stylebertvits2Style)
 
             return (
               <>
@@ -680,7 +679,9 @@ const Voice = () => {
                 <div className="mt-3">
                   <TextButton
                     onClick={fetchSbv2Models}
-                    disabled={!stylebertvits2ServerUrl.trim() || sbv2ModelsLoading}
+                    disabled={
+                      !stylebertvits2ServerUrl.trim() || sbv2ModelsLoading
+                    }
                   >
                     {sbv2ModelsLoading
                       ? '...'
@@ -720,7 +721,9 @@ const Voice = () => {
                       value={stylebertvits2ModelId}
                       onChange={(e) => {
                         const modelId = e.target.value
-                        const model = sbv2Models.find((m) => m.modelId === modelId)
+                        const model = sbv2Models.find(
+                          (m) => m.modelId === modelId
+                        )
                         settingsStore.setState({
                           stylebertvits2ModelId: modelId,
                           stylebertvits2Style:
@@ -850,9 +853,7 @@ const Voice = () => {
                 <p className="my-1 text-xs text-gray-600 whitespace-pre-wrap">
                   {t('IrodoriTTSServerHint')}
                 </p>
-                <div className="mt-4 font-bold">
-                  {t('IrodoriTTSServerURL')}
-                </div>
+                <div className="mt-4 font-bold">{t('IrodoriTTSServerURL')}</div>
                 <div className="mt-2">
                   <input
                     className="text-ellipsis px-4 py-2 w-full bg-white hover:bg-white-hover rounded-lg"
@@ -957,7 +958,9 @@ const Voice = () => {
                     })
                   }
                 />
-                <div className="mt-4 font-bold">{t('IrodoriTTSInjectEmotion')}</div>
+                <div className="mt-4 font-bold">
+                  {t('IrodoriTTSInjectEmotion')}
+                </div>
                 <ToggleSwitch
                   enabled={irodoriTtsInjectEmotion}
                   onChange={(v) =>

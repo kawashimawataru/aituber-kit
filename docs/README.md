@@ -33,13 +33,13 @@ docs/
 
 ## クイックリンク
 
-| 目的 | ファイル |
-|------|----------|
-| **今何をすべきか** | [dev-log/STATUS.md](dev-log/STATUS.md) |
-| **全体ビジョン** | [project/vision.md](project/vision.md) |
-| **フェーズとタスク** | [project/phases/README.md](project/phases/README.md) |
-| **機能の実装済み/未実装** | [project/matrix.md](project/matrix.md) |
-| **今日の作業記録** | [dev-log/](dev-log/) |
+| 目的                      | ファイル                                             |
+| ------------------------- | ---------------------------------------------------- |
+| **今何をすべきか**        | [dev-log/STATUS.md](dev-log/STATUS.md)               |
+| **全体ビジョン**          | [project/vision.md](project/vision.md)               |
+| **フェーズとタスク**      | [project/phases/README.md](project/phases/README.md) |
+| **機能の実装済み/未実装** | [project/matrix.md](project/matrix.md)               |
+| **今日の作業記録**        | [dev-log/](dev-log/)                                 |
 
 ---
 

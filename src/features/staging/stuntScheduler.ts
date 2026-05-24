@@ -62,8 +62,8 @@ export async function fireStunt(
         const ss = settingsStore.getState()
         const poseConfig = ss.poseConfigs.find((p) => p.id === def.motionId)
         if (poseConfig) {
-          void viewer.model
-            .poseManager.applyPose(viewer.model, def.motionId!, poseConfig)
+          void viewer.model.poseManager
+            .applyPose(viewer.model, def.motionId!, poseConfig)
             .catch(() => {})
         }
       }

@@ -1,7 +1,10 @@
 import { useEffect, useRef, useCallback } from 'react'
 import settingsStore from '@/features/stores/settings'
 import homeStore from '@/features/stores/home'
-import { captureFrameFromVideo, computeFrameDiff } from '@/features/vision/screenCapture'
+import {
+  captureFrameFromVideo,
+  computeFrameDiff,
+} from '@/features/vision/screenCapture'
 import { generateScreenCommentary } from '@/features/vision/screenCommentator'
 import { updateSituation } from '@/features/chat/situationModel'
 import { messageSelectors } from '@/features/messages/messageSelectors'
@@ -22,61 +25,64 @@ export function useScreenCommentary(
   const lastFrameRef = useRef<string | null>(null)
   const isRunningRef = useRef(false)
 
-  const capture = useCallback(async (videoEl: HTMLVideoElement) => {
-    if (isRunningRef.current) return
-    isRunningRef.current = true
+  const capture = useCallback(
+    async (videoEl: HTMLVideoElement) => {
+      if (isRunningRef.current) return
+      isRunningRef.current = true
 
-    try {
-      const ss = settingsStore.getState()
-      const hs = homeStore.getState()
+      try {
+        const ss = settingsStore.getState()
+        const hs = homeStore.getState()
 
-      // 発話中・AI処理中は実況しない（TTS キューの衝突を防ぐ）
-      if (hs.isSpeaking || hs.chatProcessing) return
+        // 発話中・AI処理中は実況しない（TTS キューの衝突を防ぐ）
+        if (hs.isSpeaking || hs.chatProcessing) return
 
-      const frame = captureFrameFromVideo(videoEl)
+        const frame = captureFrameFromVideo(videoEl)
 
-      // 差分チェック
-      if (lastFrameRef.current) {
-        const diff = await computeFrameDiff(lastFrameRef.current, frame)
-        updateSituation({ screenChangeScore: diff })
-        if (diff < ss.screenCommentaryThreshold) return
+        // 差分チェック
+        if (lastFrameRef.current) {
+          const diff = await computeFrameDiff(lastFrameRef.current, frame)
+          updateSituation({ screenChangeScore: diff })
+          if (diff < ss.screenCommentaryThreshold) return
+        }
+
+        lastFrameRef.current = frame
+
+        // 会話履歴（テキストのみ、直近 6 件）
+        const chatLog = homeStore.getState().chatLog
+        const recentMessages = messageSelectors
+          .cutImageMessage(chatLog.slice(-6))
+          .filter((m) => m.role === 'user' || m.role === 'assistant')
+          .map((m) => ({
+            role: m.role as 'user' | 'assistant',
+            content: sanitizeVisionCommentaryText(
+              typeof m.content === 'string' ? m.content : ''
+            ),
+          }))
+          .filter((m) => m.content)
+
+        // AI設定を UI 設定から取得
+        const aiOptions = buildAiOptions(ss)
+
+        const result = await generateScreenCommentary(frame, {
+          ...aiOptions,
+          customPrompt: ss.screenCommentaryPrompt || undefined,
+          maxTokens: ss.screenCommentaryMaxTokens,
+          systemPrompt: ss.systemPrompt || undefined,
+          chatHistory: recentMessages,
+        })
+
+        if (result.text) {
+          onCommentaryGenerated(result.text, result.emotion)
+        }
+      } catch (err) {
+        console.error('[ScreenCommentary] error:', err)
+      } finally {
+        isRunningRef.current = false
       }
-
-      lastFrameRef.current = frame
-
-      // 会話履歴（テキストのみ、直近 6 件）
-      const chatLog = homeStore.getState().chatLog
-      const recentMessages = messageSelectors
-        .cutImageMessage(chatLog.slice(-6))
-        .filter((m) => m.role === 'user' || m.role === 'assistant')
-        .map((m) => ({
-          role: m.role as 'user' | 'assistant',
-          content: sanitizeVisionCommentaryText(
-            typeof m.content === 'string' ? m.content : ''
-          ),
-        }))
-        .filter((m) => m.content)
-
-      // AI設定を UI 設定から取得
-      const aiOptions = buildAiOptions(ss)
-
-      const result = await generateScreenCommentary(frame, {
-        ...aiOptions,
-        customPrompt: ss.screenCommentaryPrompt || undefined,
-        maxTokens: ss.screenCommentaryMaxTokens,
-        systemPrompt: ss.systemPrompt || undefined,
-        chatHistory: recentMessages,
-      })
-
-      if (result.text) {
-        onCommentaryGenerated(result.text, result.emotion)
-      }
-    } catch (err) {
-      console.error('[ScreenCommentary] error:', err)
-    } finally {
-      isRunningRef.current = false
-    }
-  }, [onCommentaryGenerated])
+    },
+    [onCommentaryGenerated]
+  )
 
   useEffect(() => {
     const cleanup = () => {
@@ -111,8 +117,10 @@ export function useScreenCommentary(
     }
 
     const unsubscribe = settingsStore.subscribe((state, prev) => {
-      const enabledChanged = state.screenCommentaryEnabled !== prev.screenCommentaryEnabled
-      const intervalChanged = state.screenCommentaryInterval !== prev.screenCommentaryInterval
+      const enabledChanged =
+        state.screenCommentaryEnabled !== prev.screenCommentaryEnabled
+      const intervalChanged =
+        state.screenCommentaryInterval !== prev.screenCommentaryInterval
 
       if (enabledChanged || intervalChanged) {
         if (state.screenCommentaryEnabled) {

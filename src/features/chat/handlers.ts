@@ -281,10 +281,7 @@ const extractAndApplyBgTag = (text: string): string => {
 const extractSentence = (
   text: string
 ): { sentence: string; remainingText: string } => {
-  return extractSentenceForVoice(
-    text,
-    settingsStore.getState().selectVoice
-  )
+  return extractSentenceForVoice(text, settingsStore.getState().selectVoice)
 }
 
 /**

@@ -102,9 +102,7 @@ export async function playLaughSE(type: LaughType): Promise<void> {
   // 表情先行（4.5-6）: happy 表情を SE より先に適用
   const viewer = homeStore.getState().viewer
   if (viewer?.model?.emoteController) {
-    viewer.model.emoteController.playEmotion(
-      'happy' as VRMExpressionPresetName
-    )
+    viewer.model.emoteController.playEmotion('happy' as VRMExpressionPresetName)
     await new Promise<void>((resolve) => setTimeout(resolve, 100))
   }
   await playSE(getLaughSEPath(type), 0.7)
@@ -121,7 +119,9 @@ export function parseLaughTag(text: string): {
   if (match) {
     return {
       laughType: match[1] as LaughType,
-      remainingText: text.slice(text.indexOf(match[0]) + match[0].length).trimStart(),
+      remainingText: text
+        .slice(text.indexOf(match[0]) + match[0].length)
+        .trimStart(),
     }
   }
   return { laughType: null, remainingText: text }

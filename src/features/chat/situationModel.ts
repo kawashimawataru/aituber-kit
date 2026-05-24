@@ -10,7 +10,7 @@ export interface SessionSituation {
   aiSpeaking: boolean
   silenceSec: number
   lastCommentAt: number | null
-  screenChangeScore: number   // 0-1 (Phase 2 から連携)
+  screenChangeScore: number // 0-1 (Phase 2 から連携)
   chatBacklog: number
 }
 
@@ -29,9 +29,7 @@ export function getSituation(): SessionSituation {
   return { ..._situation }
 }
 
-export function updateSituation(
-  patch: Partial<SessionSituation>
-): void {
+export function updateSituation(patch: Partial<SessionSituation>): void {
   _situation = { ..._situation, ...patch }
 }
 

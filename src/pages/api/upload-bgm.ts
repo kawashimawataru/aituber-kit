@@ -32,9 +32,7 @@ export default async function handler(
   }
 
   if (isRestrictedMode()) {
-    return res
-      .status(403)
-      .json(createRestrictedModeErrorResponse('upload-bgm'))
+    return res.status(403).json(createRestrictedModeErrorResponse('upload-bgm'))
   }
 
   const form = formidable(formOptions)

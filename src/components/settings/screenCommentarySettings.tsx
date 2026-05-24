@@ -73,11 +73,13 @@ const ScreenCommentarySettings = () => {
             <div className="my-4 text-xl font-bold">
               最大トークン数: {maxTokens}
               <span className="ml-2 text-sm font-normal text-gray-500">
-                （日本語 {Math.round(maxTokens / 1.8)}〜{Math.round(maxTokens / 1.2)} 文字相当）
+                （日本語 {Math.round(maxTokens / 1.8)}〜
+                {Math.round(maxTokens / 1.2)} 文字相当）
               </span>
             </div>
             <div className="my-2 text-sm whitespace-pre-wrap">
-              実況コメントの最大長。短くするほど1〜2文に収まりやすくなります（推奨: 100〜200）。
+              実況コメントの最大長。短くするほど1〜2文に収まりやすくなります（推奨:
+              100〜200）。
             </div>
             <input
               type="range"
@@ -107,7 +109,9 @@ const ScreenCommentarySettings = () => {
               placeholder={t('ScreenCommentaryPromptPlaceholder')}
               value={prompt}
               onChange={(e) =>
-                settingsStore.setState({ screenCommentaryPrompt: e.target.value })
+                settingsStore.setState({
+                  screenCommentaryPrompt: e.target.value,
+                })
               }
             />
           </div>

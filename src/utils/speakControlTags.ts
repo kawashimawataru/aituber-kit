@@ -17,6 +17,7 @@ export function stripSpeakControlTags(text: string): string {
     .replace(/\[motion:[^\]]+\]/gi, '')
     .replace(/\[stunt:[a-z_]+\]/gi, '')
     .replace(/\[bg:[^\]]+\]/gi, '')
+    .replace(/\[PIANO:[^\]]+\]/gi, '')
     .replace(/\[laugh:(?:short|medium|big)\]/gi, '')
     .replace(META_TAG_PATTERN, '')
     .replace(EMOTION_TAG_PATTERN, '')

@@ -5,6 +5,7 @@ import toastStore from '@/features/stores/toast'
 import homeStore from '@/features/stores/home'
 import { useAudioProcessing } from './useAudioProcessing'
 import { SpeakQueue } from '@/features/messages/speakQueue'
+import { updateSituation } from '@/features/chat/situationModel'
 
 /**
  * Whisper APIを使用した音声認識のカスタムフック
@@ -110,6 +111,7 @@ export function useWhisperRecognition(
     // リスニング状態を更新
     isListeningRef.current = false
     setIsListening(false)
+    updateSituation({ humanSpeaking: false })
 
     // 録音を停止して音声データを取得
     const audioBlob = await stopRecording()
@@ -171,6 +173,7 @@ export function useWhisperRecognition(
       // リスニング状態を更新
       isListeningRef.current = true
       setIsListening(true)
+      updateSituation({ humanSpeaking: true })
     } else {
       toastStore.getState().addToast({
         message: t('Toasts.SpeechRecognitionError'),

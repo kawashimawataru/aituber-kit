@@ -42,6 +42,12 @@ export default async function handler(
   const irodoriTtsSpeed = body.irodoriTtsSpeed ?? 1.0
   const irodoriTtsApiKey =
     body.irodoriTtsApiKey || process.env.IRODORI_TTS_API_KEY || ''
+  // 0 = random (not sent), positive = fixed seed
+  const irodoriTtsSeed = Number(body.irodoriTtsSeed ?? 0)
+  // 0 = use server default (not sent), positive = per-request override
+  const irodoriTtsNumSteps = Number(body.irodoriTtsNumSteps ?? 0)
+  // 0 = use server default (not sent), non-zero = override sway coefficient
+  const irodoriTtsSwayCoeff = Number(body.irodoriTtsSwayCoeff ?? 0)
 
   try {
     const serverUrl = resolveServerUrl(body.irodoriTtsServerUrl)
@@ -63,6 +69,15 @@ export default async function handler(
     }
     if (irodoriTtsVoice) {
       payload.voice = irodoriTtsVoice
+    }
+    if (irodoriTtsSeed > 0) {
+      payload.seed = irodoriTtsSeed
+    }
+    if (irodoriTtsNumSteps > 0) {
+      payload.num_steps = irodoriTtsNumSteps
+    }
+    if (irodoriTtsSwayCoeff !== 0) {
+      payload.sway_coeff = irodoriTtsSwayCoeff
     }
 
     const voice = await fetch(speechUrl, {

@@ -26,19 +26,31 @@ type RequestBody = {
   // 会話コンテキスト
   systemPrompt?: string
   chatHistory?: ChatEntry[]
+  // 配信状況コンテキスト（画面・視聴者・配信者）
+  streamContext?: string
 }
 
 type ResponseData = { text: string; emotion: string } | { error: string }
 
 const VISION_INSTRUCTION = `
-あなたは今、配信画面を見ながら会話しています。
-上の会話の流れと画面の内容を踏まえて、次の一言を1〜2文で自然な口語の日本語にしてください。
+あなたは今、配信中のAI VTuberとして画面を見ています。
+[配信状況] ブロック（あれば）には、直近の視聴者コメント・配信者の発言・前回の画面実況が含まれています。
+
+これらすべてを踏まえて、今この瞬間に自然に口から出る一言を1〜3文で生成してください。
+
+以下を意識してください:
+- 画面で起きていることに気づいてリアクションする
+- 視聴者のコメントを拾って答える・ツッコむ
+- 配信者とバンターしたり同意したりする
+- 複数の要素を自然に組み合わせる（「○○さんの言う通り、画面もそれっぽいし」など）
+- 硬くならず、配信中のテンポで話す
+- 同じ話を繰り返さない
 
 【text フィールドのルール — 厳守】
-- プレーンな日本語のみ（視聴者向けの実況・感想）
-- 制御タグは一切禁止: [stunt:xxx] [motion:xxx] [bg:xxx] [laugh:xxx] [thought] [surprised] など [ ] 形式すべて
-- 画面のUIラベル・ボタン名・技術説明文をそのまま読み上げない（要約してコメントする）
-- 感情は emotion フィールドのみ。text 内に感情タグを書かない
+- プレーンな日本語のみ
+- 制御タグは一切禁止: [stunt:xxx] [motion:xxx] [bg:xxx] [laugh:xxx] など [ ] 形式すべて
+- 画面のUIラベル・ボタン名をそのまま読み上げない（要約してコメントする）
+- 感情は emotion フィールドのみ
 
 必ず以下のJSON形式のみで返答してください（コードブロック不要）:
 {"text": "発話内容", "emotion": "happy|sad|angry|relaxed|surprised|neutral のいずれか"}`
@@ -62,6 +74,7 @@ export default async function handler(
     azureEndpoint,
     systemPrompt,
     chatHistory = [],
+    streamContext,
   } = req.body as RequestBody
 
   const maxTokens = bodyMaxTokens && bodyMaxTokens > 0 ? bodyMaxTokens : 150
@@ -95,10 +108,11 @@ export default async function handler(
     resolvedAzureEndpoint.match(/\/deployments\/([^/]+)/)?.[1] || ''
   const resolvedModel = aiService === 'azure' ? azureDeployment : model
 
-  // システムメッセージ: キャラ設定 + 実況指示
+  // システムメッセージ: キャラ設定 + 配信コンテキスト + 実況指示
   const systemContent = [
     systemPrompt || '',
     customPrompt || '',
+    streamContext || '',
     VISION_INSTRUCTION,
   ]
     .filter(Boolean)

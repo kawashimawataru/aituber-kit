@@ -10,6 +10,7 @@ import { TextButton } from '../textButton'
 import { ToggleSwitch } from '../toggleSwitch'
 import { IMAGE_CONSTANTS } from '@/constants/images'
 import { useRestrictedMode } from '@/hooks/useRestrictedMode'
+import { THEME_SWATCHES, ThemeId } from '@/features/constants/themes'
 
 const Based = () => {
   const { t } = useTranslation()
@@ -434,30 +435,34 @@ const Based = () => {
           {t('ColorThemeInfo')}
         </div>
 
-        <div className="flex flex-col mb-4">
-          <select
-            className="text-ellipsis px-4 py-2 w-full sm:w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
-            value={colorTheme}
-            onChange={(e) => {
-              const theme = e.target.value as
-                | 'default'
-                | 'cool'
-                | 'mono'
-                | 'ocean'
-                | 'forest'
-                | 'sunset'
-              settingsStore.setState({ colorTheme: theme })
-              // テーマをhtmlタグに適用
-              document.documentElement.setAttribute('data-theme', theme)
-            }}
-          >
-            <option value="default">{t('ThemeDefault')}</option>
-            <option value="mono">{t('ThemeMono')}</option>
-            <option value="cool">{t('ThemeCool')}</option>
-            <option value="ocean">{t('ThemeOcean')}</option>
-            <option value="forest">{t('ThemeForest')}</option>
-            <option value="sunset">{t('ThemeSunset')}</option>
-          </select>
+        <div className="grid grid-cols-3 gap-3 mt-3">
+          {THEME_SWATCHES.map((theme) => (
+            <button
+              key={theme.id}
+              onClick={() => {
+                settingsStore.setState({ colorTheme: theme.id as ThemeId })
+                document.documentElement.setAttribute('data-theme', theme.id)
+              }}
+              className={`rounded-xl p-2.5 text-center transition-all border-2 ${
+                colorTheme === theme.id
+                  ? 'border-primary shadow-lg scale-105'
+                  : 'border-transparent hover:border-gray-300'
+              } bg-white/60 hover:bg-white/80`}
+            >
+              {/* カラーバー */}
+              <div className="flex gap-0.5 mb-2 rounded-md overflow-hidden h-7">
+                <div className="flex-1" style={{ background: theme.primary }} />
+                <div
+                  className="flex-1"
+                  style={{ background: theme.secondary }}
+                />
+                <div className="flex-1" style={{ background: theme.base }} />
+              </div>
+              <span className="text-xs font-semibold text-gray-700">
+                {t(theme.nameKey)}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
     </>

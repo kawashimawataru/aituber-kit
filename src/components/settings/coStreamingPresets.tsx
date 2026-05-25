@@ -76,7 +76,15 @@ const CoStreamingPresets = () => {
   const { t } = useTranslation()
 
   const applyPreset = (prompt: string) => {
-    settingsStore.setState({ systemPrompt: prompt })
+    const { characterName, coStreamerName } = settingsStore.getState()
+    let resolved = prompt
+    if (characterName) {
+      resolved = resolved.replaceAll('{キャラクター名}', characterName)
+    }
+    if (coStreamerName) {
+      resolved = resolved.replaceAll('{配信者名}', coStreamerName)
+    }
+    settingsStore.setState({ systemPrompt: resolved })
   }
 
   return (

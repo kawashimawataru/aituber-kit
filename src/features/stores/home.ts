@@ -7,6 +7,11 @@ import { messageSelectors } from '../messages/messageSelectors'
 import { Live2DModel } from 'untitled-pixi-live2d-engine/cubism'
 import { generateMessageId } from '@/utils/messageUtils'
 import { addEmbeddingsToMessages } from '@/features/memory/memoryStoreSync'
+import {
+  getConversationLogService,
+  todayString,
+} from '@/features/memory/conversationLogService'
+import { extractTextContent } from '@/features/memory/memoryStoreSync'
 import { PresenceState, PresenceError } from '@/features/presence/presenceTypes'
 
 export interface PersistedState {
@@ -35,6 +40,8 @@ export interface TransientState {
   isLive2dLoaded: boolean
   setIsLive2dLoaded: (loaded: boolean) => void
   isSpeaking: boolean
+  /** 配信者（ユーザー）の現在の発話テキスト — UserSpeechDisplay で表示 */
+  displayUserSpeech: string
   // Presence detection transient state
   presenceState: PresenceState
   presenceError: PresenceError | null
@@ -166,6 +173,7 @@ const homeStore = create<HomeState>()(
       isLive2dLoaded: false,
       setIsLive2dLoaded: (loaded) => set(() => ({ isLive2dLoaded: loaded })),
       isSpeaking: false,
+      displayUserSpeech: '',
       // Presence detection initial state
       presenceState: 'idle',
       presenceError: null,
@@ -263,6 +271,89 @@ homeStore.subscribe((state, prevState) => {
   ) {
     resetSaveState()
   }
+})
+
+// 日別会話ログ自動保存
+let convLogDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+homeStore.subscribe((state, prevState) => {
+  if (state.chatLog === prevState.chatLog) return
+  if (convLogDebounceTimer) clearTimeout(convLogDebounceTimer)
+  convLogDebounceTimer = setTimeout(async () => {
+    try {
+      const svc = getConversationLogService()
+      if (!svc.isAvailable()) await svc.initialize()
+
+      const today = todayString()
+      // タイムスタンプが今日のもの or タイムスタンプなしのメッセージを今日として保存
+      const messages = state.chatLog
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => {
+          const content = extractTextContent(m.content)
+          if (!content) return null
+          const ts = m.timestamp ?? new Date().toISOString()
+          const date = ts.slice(0, 10)
+          return {
+            role: m.role as 'user' | 'assistant',
+            content,
+            timestamp: ts,
+            date,
+          }
+        })
+        .filter(Boolean) as Array<{
+        role: 'user' | 'assistant'
+        content: string
+        timestamp: string
+        date: string
+      }>
+
+      // 日付別にグループ化して保存
+      const byDate = new Map<string, typeof messages>()
+      for (const m of messages) {
+        const existing = byDate.get(m.date) ?? []
+        existing.push(m)
+        byDate.set(m.date, existing)
+      }
+
+      // タイムスタンプなしメッセージ（今日扱い）を取得して追記
+      const todayMsgs = byDate.get(today) ?? byDate.get('Invalid Date') ?? []
+      // 'Invalid Date' キーがあればtodayにマージ
+      if (byDate.has('Invalid Date')) {
+        const invalid = byDate.get('Invalid Date')!
+        byDate.delete('Invalid Date')
+        byDate.set(today, [...todayMsgs, ...invalid])
+      }
+
+      for (const [date, msgs] of byDate) {
+        // 既存の他日付データとマージしない（今日分のみ上書き）
+        if (date === today) {
+          await svc.saveDay(
+            date,
+            msgs.map(({ role, content, timestamp }) => ({
+              role,
+              content,
+              timestamp,
+            }))
+          )
+        } else {
+          // 過去日付分: 既存があればそちらを優先（上書きしない）
+          const existing = await svc.getDay(date)
+          if (!existing) {
+            await svc.saveDay(
+              date,
+              msgs.map(({ role, content, timestamp }) => ({
+                role,
+                content,
+                timestamp,
+              }))
+            )
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('ConversationLog auto-save failed:', e)
+    }
+  }, 3000)
 })
 
 export default homeStore

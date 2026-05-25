@@ -17,6 +17,7 @@ import {
   KioskModeSettings,
   DEFAULT_KIOSK_CONFIG,
 } from '@/features/kiosk/kioskTypes'
+import type { TtsSplitMode } from '@/utils/ttsSentenceSplit'
 import {
   AIService,
   AIVoice,
@@ -92,6 +93,7 @@ interface ModelProvider extends Live2DSettings {
   selectAIModel: string
   localLlmUrl: string
   selectVoice: AIVoice
+  ttsSplitMode: TtsSplitMode
   koeiroParam: KoeiroParam
   googleTtsType: string
   voicevoxSpeaker: string
@@ -130,6 +132,9 @@ interface ModelProvider extends Live2DSettings {
   irodoriTtsModel: string
   irodoriTtsSpeed: number
   irodoriTtsInjectEmotion: boolean
+  irodoriTtsSeed: number
+  irodoriTtsNumSteps: number
+  irodoriTtsSwayCoeff: number
   gsviTtsServerUrl: string
   gsviTtsModelId: string
   gsviTtsBatchSize: number
@@ -179,6 +184,7 @@ interface Character {
   customPresetName5: string
   selectedPresetIndex: number
   showAssistantText: boolean
+  enableFloatingComments: boolean
   showCharacterName: boolean
   systemPrompt: string
   selectedVrmPath: string
@@ -260,6 +266,7 @@ interface General {
   deepgramApiKey: string
   deepgramAutoSend: boolean
   deepgramEndpointingMs: number
+  deepgramUtteranceEndMs: number
   deepgramModel: string
   deepgramSilenceHoldMs: number
   initialSpeechTimeout: number
@@ -361,6 +368,8 @@ const getInitialValuesFromEnv = (): SettingsState => ({
   ),
   localLlmUrl: process.env.NEXT_PUBLIC_LOCAL_LLM_URL || '',
   selectVoice: (process.env.NEXT_PUBLIC_SELECT_VOICE as AIVoice) || 'voicevox',
+  ttsSplitMode:
+    (process.env.NEXT_PUBLIC_TTS_SPLIT_MODE as TtsSplitMode) || 'auto',
   koeiroParam: DEFAULT_PARAM,
   googleTtsType: process.env.NEXT_PUBLIC_GOOGLE_TTS_TYPE || '',
   voicevoxSpeaker: process.env.NEXT_PUBLIC_VOICEVOX_SPEAKER || '46',
@@ -437,6 +446,12 @@ const getInitialValuesFromEnv = (): SettingsState => ({
     parseFloat(process.env.NEXT_PUBLIC_IRODORI_TTS_SPEED || '1.0') || 1.0,
   irodoriTtsInjectEmotion:
     process.env.NEXT_PUBLIC_IRODORI_TTS_INJECT_EMOTION !== 'false',
+  irodoriTtsSeed:
+    parseInt(process.env.NEXT_PUBLIC_IRODORI_TTS_SEED || '0') || 0,
+  irodoriTtsNumSteps:
+    parseInt(process.env.NEXT_PUBLIC_IRODORI_TTS_NUM_STEPS || '0') || 0,
+  irodoriTtsSwayCoeff:
+    parseFloat(process.env.NEXT_PUBLIC_IRODORI_TTS_SWAY_COEFF || '0') || 0,
   gsviTtsServerUrl:
     process.env.NEXT_PUBLIC_GSVI_TTS_URL || 'http://127.0.0.1:5000/tts',
   gsviTtsModelId: process.env.NEXT_PUBLIC_GSVI_TTS_MODEL_ID || '0',
@@ -517,6 +532,8 @@ const getInitialValuesFromEnv = (): SettingsState => ({
   selectedPresetIndex: 0,
   showAssistantText:
     process.env.NEXT_PUBLIC_SHOW_ASSISTANT_TEXT === 'true' ? true : false,
+  enableFloatingComments:
+    process.env.NEXT_PUBLIC_ENABLE_FLOATING_COMMENTS === 'true' ? true : false,
   showCharacterName:
     process.env.NEXT_PUBLIC_SHOW_CHARACTER_NAME === 'true' ? true : false,
   systemPrompt:
@@ -635,9 +652,12 @@ const getInitialValuesFromEnv = (): SettingsState => ({
   deepgramApiKey: process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY || '',
   deepgramAutoSend: process.env.NEXT_PUBLIC_DEEPGRAM_AUTO_SEND !== 'false',
   deepgramEndpointingMs:
-    parseInt(process.env.NEXT_PUBLIC_DEEPGRAM_ENDPOINTING_MS || '300', 10) ||
-    300,
-  deepgramModel: process.env.NEXT_PUBLIC_DEEPGRAM_MODEL || 'nova-2',
+    parseInt(process.env.NEXT_PUBLIC_DEEPGRAM_ENDPOINTING_MS || '700', 10) ||
+    700,
+  deepgramUtteranceEndMs:
+    parseInt(process.env.NEXT_PUBLIC_DEEPGRAM_UTTERANCE_END_MS || '1500', 10) ||
+    1500,
+  deepgramModel: process.env.NEXT_PUBLIC_DEEPGRAM_MODEL || 'nova-3',
   deepgramSilenceHoldMs:
     parseInt(process.env.NEXT_PUBLIC_DEEPGRAM_SILENCE_HOLD_MS || '1500', 10) ||
     1500,
@@ -971,6 +991,7 @@ const settingsStore = create<SettingsState>()(
         selectAIModel: state.selectAIModel,
         localLlmUrl: state.localLlmUrl,
         selectVoice: state.selectVoice,
+        ttsSplitMode: state.ttsSplitMode,
         koeiroParam: state.koeiroParam,
         googleTtsType: state.googleTtsType,
         voicevoxSpeaker: state.voicevoxSpeaker,
@@ -1009,6 +1030,9 @@ const settingsStore = create<SettingsState>()(
         irodoriTtsModel: state.irodoriTtsModel,
         irodoriTtsSpeed: state.irodoriTtsSpeed,
         irodoriTtsInjectEmotion: state.irodoriTtsInjectEmotion,
+        irodoriTtsSeed: state.irodoriTtsSeed,
+        irodoriTtsNumSteps: state.irodoriTtsNumSteps,
+        irodoriTtsSwayCoeff: state.irodoriTtsSwayCoeff,
         gsviTtsServerUrl: state.gsviTtsServerUrl,
         gsviTtsModelId: state.gsviTtsModelId,
         gsviTtsBatchSize: state.gsviTtsBatchSize,
@@ -1051,6 +1075,7 @@ const settingsStore = create<SettingsState>()(
         customPresetName5: state.customPresetName5,
         selectedPresetIndex: state.selectedPresetIndex,
         showAssistantText: state.showAssistantText,
+        enableFloatingComments: state.enableFloatingComments,
         showCharacterName: state.showCharacterName,
         systemPrompt: state.systemPrompt,
         selectLanguage: state.selectLanguage,
@@ -1120,6 +1145,7 @@ const settingsStore = create<SettingsState>()(
         deepgramApiKey: state.deepgramApiKey,
         deepgramAutoSend: state.deepgramAutoSend,
         deepgramEndpointingMs: state.deepgramEndpointingMs,
+        deepgramUtteranceEndMs: state.deepgramUtteranceEndMs,
         deepgramModel: state.deepgramModel,
         deepgramSilenceHoldMs: state.deepgramSilenceHoldMs,
         customApiUrl: state.customApiUrl,

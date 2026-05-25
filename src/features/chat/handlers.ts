@@ -31,13 +31,19 @@ import {
   getTextFromMessageContent,
 } from '@/utils/multimodalContent'
 import {
-  extractSentenceForVoice,
+  extractSentenceByMode,
   finalizeStyleBertVits2Tail,
   isInvalidStandaloneTtsUnit,
 } from '@/utils/ttsSentenceSplit'
 import { sbv2SpeakBatcher } from '@/features/messages/sbv2SpeakBatcher'
 import { compressImageDataUrl } from '@/utils/compressImageForApi'
 import { stripSpeakControlTags } from '@/utils/speakControlTags'
+import {
+  buildContextBlock,
+  setStreamerLastSaid,
+} from '@/features/streaming/streamContext'
+import { PROJECT_REGISTRY } from '@/features/projects/registry'
+import projectStore from '@/features/stores/projectStore'
 
 // セッションIDを生成する関数
 const generateSessionId = () => generateMessageId()
@@ -281,7 +287,8 @@ const extractAndApplyBgTag = (text: string): string => {
 const extractSentence = (
   text: string
 ): { sentence: string; remainingText: string } => {
-  return extractSentenceForVoice(text, settingsStore.getState().selectVoice)
+  const ss = settingsStore.getState()
+  return extractSentenceByMode(text, ss.ttsSplitMode, ss.selectVoice)
 }
 
 /**
@@ -905,15 +912,17 @@ export const processAIResponse = async (messages: Message[]) => {
               parseLaughTag(doneAfterStunt)
             if (doneLaughType) void playLaughSE(doneLaughType)
             const doneAfterBg = extractAndApplyBgTag(doneAfterLaugh)
-            const tailText =
-              settingsStore.getState().selectVoice === 'stylebertvits2'
-                ? finalizeStyleBertVits2Tail(doneAfterBg)
-                : doneAfterBg
+            const { selectVoice: doneVoice, ttsSplitMode: doneSplitMode } =
+              settingsStore.getState()
+            const isAutoSbv2 =
+              doneVoice === 'stylebertvits2' && doneSplitMode === 'auto'
+            const tailText = isAutoSbv2
+              ? finalizeStyleBertVits2Tail(doneAfterBg)
+              : doneAfterBg
 
             if (
               tailText &&
-              (settingsStore.getState().selectVoice !== 'stylebertvits2' ||
-                !isInvalidStandaloneTtsUnit(tailText))
+              (!isAutoSbv2 || !isInvalidStandaloneTtsUnit(tailText))
             ) {
               hasSpeakBeenCalled =
                 handleSpeakAndStateUpdate(
@@ -987,6 +996,13 @@ export const processAIResponse = async (messages: Message[]) => {
       role: 'assistant',
       content: currentMessageContent.trim(),
     }).catch(() => {})
+
+    // アクティブプロジェクトの onAiResponse フックを呼ぶ
+    const activeIds2 = projectStore.getState().activeProjectIds
+    for (const id of activeIds2) {
+      const proj = PROJECT_REGISTRY.find((p) => p.id === id)
+      proj?.onAiResponse?.(currentMessageContent.trim())
+    }
   }
   if (isCodeBlock && codeBlockContent.trim()) {
     console.warn(
@@ -1085,6 +1101,31 @@ export const handleSendChatFn =
       }
     } else {
       let systemPrompt = ss.systemPrompt
+
+      // 共演配信モード: 共演者名をシステムプロンプトに注入
+      if (ss.coStreamingMode && ss.coStreamerName) {
+        systemPrompt += `\n\n共演配信中。人間の配信者（共演者）の名前は「${ss.coStreamerName}」です。`
+      }
+
+      // 配信状況コンテキスト注入（画面・視聴者・配信者を一括で）
+      if (!userName) {
+        // userName なし = 配信者本人の発言
+        setStreamerLastSaid(newMessage)
+      }
+      const ctxBlock = buildContextBlock(ss.coStreamerName || undefined)
+      if (ctxBlock) {
+        systemPrompt += ctxBlock
+      }
+
+      // アクティブなプロジェクトのシステムプロンプト追記
+      const activeIds = projectStore.getState().activeProjectIds
+      for (const id of activeIds) {
+        const proj = PROJECT_REGISTRY.find((p) => p.id === id)
+        if (proj?.systemPromptAppend) {
+          systemPrompt += proj.systemPromptAppend()
+        }
+      }
+
       if (ss.slideMode) {
         if (sls.isPlaying) {
           return

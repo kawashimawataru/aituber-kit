@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes niconicoFloat {
+  from {
+    transform: translateX(calc(100vw + 100%));
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in-right {
+  animation: fadeInRight 0.35s ease-out both;
+}
+
 body {
   background-position: top center;
   background-attachment: fixed;

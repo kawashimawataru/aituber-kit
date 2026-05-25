@@ -13,6 +13,7 @@ import {
   OpenAITTSVoice,
   OpenAITTSModel,
 } from '@/features/constants/settings'
+import type { TtsSplitMode } from '@/utils/ttsSentenceSplit'
 import { getOpenAITTSModels } from '@/features/constants/aiModels'
 import { testVoice } from '@/features/messages/speakCharacter'
 import settingsStore from '@/features/stores/settings'
@@ -38,6 +39,7 @@ const Voice = () => {
   const audioMode = settingsStore((s) => s.audioMode)
 
   const selectVoice = settingsStore((s) => s.selectVoice)
+  const ttsSplitMode = settingsStore((s) => s.ttsSplitMode)
   const koeiroParam = settingsStore((s) => s.koeiroParam)
   const googleTtsType = settingsStore((s) => s.googleTtsType)
   const voicevoxSpeaker = settingsStore((s) => s.voicevoxSpeaker)
@@ -96,6 +98,9 @@ const Voice = () => {
   const irodoriTtsInjectEmotion = settingsStore(
     (s) => s.irodoriTtsInjectEmotion
   )
+  const irodoriTtsSeed = settingsStore((s) => s.irodoriTtsSeed)
+  const irodoriTtsNumSteps = settingsStore((s) => s.irodoriTtsNumSteps)
+  const irodoriTtsSwayCoeff = settingsStore((s) => s.irodoriTtsSwayCoeff)
   const gsviTtsServerUrl = settingsStore((s) => s.gsviTtsServerUrl)
   const gsviTtsModelId = settingsStore((s) => s.gsviTtsModelId)
   const gsviTtsBatchSize = settingsStore((s) => s.gsviTtsBatchSize)
@@ -326,6 +331,44 @@ const Voice = () => {
           <option value="openai">{t('UsingOpenAITTS')}</option>
           <option value="azure">{t('UsingAzureTTS')}</option>
         </select>
+      </div>
+
+      <div className="border-t border-gray-300 pt-6 my-6">
+        <div className="mb-4 text-xl font-bold">{t('TTSSplitMode')}</div>
+        <div className="my-2 text-sm whitespace-pre-wrap">
+          {t('TTSSplitModeDesc')}
+        </div>
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          {(
+            [
+              ['auto', t('TTSSplitModeAuto'), t('TTSSplitModeAutoDesc')],
+              [
+                'punctuation',
+                t('TTSSplitModePunctuation'),
+                t('TTSSplitModePunctuationDesc'),
+              ],
+              [
+                'sentence',
+                t('TTSSplitModeSentence'),
+                t('TTSSplitModeSentenceDesc'),
+              ],
+              ['all', t('TTSSplitModeAll'), t('TTSSplitModeAllDesc')],
+            ] as [TtsSplitMode, string, string][]
+          ).map(([id, label, desc]) => (
+            <button
+              key={id}
+              onClick={() => settingsStore.setState({ ttsSplitMode: id })}
+              className={`p-3 rounded-xl border-2 text-left transition-all ${
+                ttsSplitMode === id
+                  ? 'border-primary bg-primary/10'
+                  : 'border-gray-200 bg-white hover:border-gray-400'
+              }`}
+            >
+              <div className="font-bold text-sm">{label}</div>
+              <div className="text-xs text-gray-500 mt-1">{desc}</div>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="border-t border-gray-300 pt-6 my-6">
@@ -970,6 +1013,84 @@ const Voice = () => {
                 <p className="mt-2 text-xs text-gray-600 whitespace-pre-wrap">
                   {t('IrodoriTTSInjectEmotionHint')}
                 </p>
+                <div className="mt-4 font-bold">
+                  {t('IrodoriTTSNumSteps')}:{' '}
+                  {irodoriTtsNumSteps === 0
+                    ? t('IrodoriTTSNumStepsDefault')
+                    : irodoriTtsNumSteps}
+                </div>
+                <p className="mt-1 text-xs text-gray-600">
+                  {t('IrodoriTTSNumStepsHint')}
+                </p>
+                <input
+                  type="range"
+                  min={0}
+                  max={20}
+                  step={1}
+                  value={irodoriTtsNumSteps}
+                  className="mt-2 mb-1 input-range"
+                  onChange={(e) =>
+                    settingsStore.setState({
+                      irodoriTtsNumSteps: Number(e.target.value),
+                    })
+                  }
+                />
+                <div className="flex justify-between text-xs text-gray-500 mb-4">
+                  <span>{t('IrodoriTTSNumStepsDefault')}</span>
+                  <span>4</span>
+                  <span>8</span>
+                  <span>12</span>
+                  <span>20</span>
+                </div>
+                <div className="mt-2 font-bold">{t('IrodoriTTSSeed')}</div>
+                <p className="mt-1 text-xs text-gray-600">
+                  {t('IrodoriTTSSeedHint')}
+                </p>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  className="mt-2 px-4 py-2 w-full md:w-1/2 bg-white hover:bg-white-hover rounded-lg text-sm"
+                  placeholder="0"
+                  value={irodoriTtsSeed}
+                  onChange={(e) =>
+                    settingsStore.setState({
+                      irodoriTtsSeed: Math.max(
+                        0,
+                        parseInt(e.target.value) || 0
+                      ),
+                    })
+                  }
+                />
+                <div className="mt-4 font-bold">
+                  {t('IrodoriTTSSwayCoeff')}:{' '}
+                  {irodoriTtsSwayCoeff === 0
+                    ? t('IrodoriTTSNumStepsDefault')
+                    : irodoriTtsSwayCoeff.toFixed(1)}
+                </div>
+                <p className="mt-1 text-xs text-gray-600">
+                  {t('IrodoriTTSSwayCoeffHint')}
+                </p>
+                <input
+                  type="range"
+                  min={-2.5}
+                  max={0}
+                  step={0.1}
+                  value={irodoriTtsSwayCoeff}
+                  className="mt-2 mb-1 input-range"
+                  onChange={(e) =>
+                    settingsStore.setState({
+                      irodoriTtsSwayCoeff: Number(e.target.value),
+                    })
+                  }
+                />
+                <div className="flex justify-between text-xs text-gray-500 mb-4">
+                  <span>-2.5</span>
+                  <span>-2.0</span>
+                  <span>-1.5</span>
+                  <span>-1.0</span>
+                  <span>{t('IrodoriTTSNumStepsDefault')}</span>
+                </div>
               </>
             )
           } else if (selectVoice === 'aivis_speech') {

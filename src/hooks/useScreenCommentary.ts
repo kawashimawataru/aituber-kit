@@ -9,6 +9,10 @@ import { generateScreenCommentary } from '@/features/vision/screenCommentator'
 import { updateSituation } from '@/features/chat/situationModel'
 import { messageSelectors } from '@/features/messages/messageSelectors'
 import { sanitizeVisionCommentaryText } from '@/utils/speakControlTags'
+import {
+  buildContextBlock,
+  setScreenSummary,
+} from '@/features/streaming/streamContext'
 
 /**
  * 画面実況フック
@@ -64,15 +68,21 @@ export function useScreenCommentary(
         // AI設定を UI 設定から取得
         const aiOptions = buildAiOptions(ss)
 
+        // 配信状況コンテキスト（視聴者コメント・配信者発言）をプロンプトに注入
+        const streamCtxBlock = buildContextBlock(ss.coStreamerName || undefined)
+
         const result = await generateScreenCommentary(frame, {
           ...aiOptions,
           customPrompt: ss.screenCommentaryPrompt || undefined,
           maxTokens: ss.screenCommentaryMaxTokens,
           systemPrompt: ss.systemPrompt || undefined,
           chatHistory: recentMessages,
+          streamContext: streamCtxBlock || undefined,
         })
 
         if (result.text) {
+          // 画面実況結果をコンテキストに保存（次回チャット呼び出しで参照される）
+          setScreenSummary(result.text)
           onCommentaryGenerated(result.text, result.emotion)
         }
       } catch (err) {

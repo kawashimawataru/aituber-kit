@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import homeStore from '@/features/stores/home'
 import menuStore from '@/features/stores/menu'
+import gameStore from '@/features/stores/gameStore'
 import settingsStore from '@/features/stores/settings'
 import slideStore from '@/features/stores/slide'
 import { AssistantText } from './assistantText'
@@ -16,6 +17,7 @@ import { isMultiModalAvailable } from '@/features/constants/aiModels'
 import { AIService } from '@/features/constants/settings'
 import { getLatestAssistantMessage } from '@/utils/assistantMessageUtils'
 import { useKioskMode } from '@/hooks/useKioskMode'
+import { THEME_SWATCHES, ThemeId } from '@/features/constants/themes'
 
 // モバイルデバイス検出用のカスタムフック
 const useIsMobile = () => {
@@ -55,6 +57,7 @@ export const Menu = () => {
   const showCapture = menuStore((s) => s.showCapture)
   const slidePlaying = slideStore((s) => s.isPlaying)
   const showAssistantText = settingsStore((s) => s.showAssistantText)
+  const gameVisible = gameStore((s) => s.gameVisible)
 
   // デモ端末モード関連
   const { isKioskMode, isTemporaryUnlocked, canAccessSettings } = useKioskMode()
@@ -64,6 +67,9 @@ export const Menu = () => {
     showControlPanel && (!isKioskMode || isTemporaryUnlocked)
 
   const [showSettings, setShowSettings] = useState(false)
+  const [showThemeSelector, setShowThemeSelector] = useState(false)
+  const themePanelRef = useRef<HTMLDivElement>(null)
+  const colorTheme = settingsStore((s) => s.colorTheme)
 
   // キオスクモードで設定アクセス権が剥奪された場合に自動クローズ
   useEffect(() => {
@@ -71,6 +77,21 @@ export const Menu = () => {
       setShowSettings(false)
     }
   }, [canAccessSettings])
+
+  // テーマパネル outside-click で閉じる
+  useEffect(() => {
+    if (!showThemeSelector) return
+    const handleClick = (e: MouseEvent) => {
+      if (
+        themePanelRef.current &&
+        !themePanelRef.current.contains(e.target as Node)
+      ) {
+        setShowThemeSelector(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showThemeSelector])
   // 会話ログ表示モード
   const CHAT_LOG_MODE = {
     HIDDEN: 0, // 非表示
@@ -235,111 +256,203 @@ export const Menu = () => {
       )}
 
       <div className="absolute z-15 m-3 sm:m-6">
-        <div
-          className="grid md:grid-flow-col gap-[8px] mb-10"
-          style={{ width: 'max-content' }}
-        >
-          {effectiveShowControlPanel && (
-            <>
-              {canAccessSettings && (
-                <div className="md:order-1 order-2">
+        <div className="relative" style={{ width: 'max-content' }}>
+          <div
+            className="grid md:grid-flow-col gap-[8px] mb-2"
+            style={{ width: 'max-content' }}
+          >
+            {effectiveShowControlPanel && (
+              <>
+                {canAccessSettings && (
+                  <div className="md:order-1 order-2">
+                    <IconButton
+                      iconName="24/Settings"
+                      isProcessing={false}
+                      onClick={() => setShowSettings(true)}
+                    ></IconButton>
+                  </div>
+                )}
+                <div className="md:order-2 order-1">
                   <IconButton
-                    iconName="24/Settings"
+                    iconName={
+                      chatLogMode === CHAT_LOG_MODE.CHAT_LOG
+                        ? '24/CommentOutline'
+                        : chatLogMode === CHAT_LOG_MODE.ASSISTANT
+                          ? '24/CommentFill'
+                          : '24/Close'
+                    }
+                    label={t('ChatLog')}
                     isProcessing={false}
-                    onClick={() => setShowSettings(true)}
-                  ></IconButton>
+                    onClick={() => setChatLogMode((prev) => (prev + 1) % 3)}
+                  />
                 </div>
-              )}
-              <div className="md:order-2 order-1">
-                <IconButton
-                  iconName={
-                    chatLogMode === CHAT_LOG_MODE.CHAT_LOG
-                      ? '24/CommentOutline'
-                      : chatLogMode === CHAT_LOG_MODE.ASSISTANT
-                        ? '24/CommentFill'
-                        : '24/Close'
-                  }
-                  label={t('ChatLog')}
-                  isProcessing={false}
-                  onClick={() => setChatLogMode((prev) => (prev + 1) % 3)}
-                />
-              </div>
-              {!youtubeMode && (
-                <>
-                  <div className="order-3">
-                    <IconButton
-                      iconName="screen-share"
-                      isProcessing={false}
-                      onClick={toggleCapture}
-                    />
-                  </div>
-                  <div className="order-4">
-                    <IconButton
-                      iconName="24/Camera"
-                      isProcessing={false}
-                      onClick={toggleWebcam}
-                    />
-                  </div>
-                  {isMultiModalAvailable(
-                    selectAIService as AIService,
-                    selectAIModel,
-                    enableMultiModal,
-                    multiModalMode,
-                    customModel
-                  ) && (
-                    <div className="order-4">
+                {!youtubeMode && (
+                  <>
+                    <div className="order-3">
                       <IconButton
-                        iconName="24/AddImage"
+                        iconName="screen-share"
                         isProcessing={false}
-                        onClick={() => imageFileInputRef.current?.click()}
-                      />
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        ref={imageFileInputRef}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (file) {
-                            const reader = new FileReader()
-                            reader.onload = (e) => {
-                              const imageUrl = e.target?.result as string
-                              homeStore.setState({ modalImage: imageUrl })
-                            }
-                            reader.readAsDataURL(file)
-                          }
-                        }}
+                        onClick={toggleCapture}
                       />
                     </div>
-                  )}
-                </>
-              )}
-              {youtubeMode && (
-                <div className="order-5">
+                    <div className="order-4">
+                      <IconButton
+                        iconName="24/Camera"
+                        isProcessing={false}
+                        onClick={toggleWebcam}
+                      />
+                    </div>
+                    {isMultiModalAvailable(
+                      selectAIService as AIService,
+                      selectAIModel,
+                      enableMultiModal,
+                      multiModalMode,
+                      customModel
+                    ) && (
+                      <div className="order-4">
+                        <IconButton
+                          iconName="24/AddImage"
+                          isProcessing={false}
+                          onClick={() => imageFileInputRef.current?.click()}
+                        />
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          ref={imageFileInputRef}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              const reader = new FileReader()
+                              reader.onload = (e) => {
+                                const imageUrl = e.target?.result as string
+                                homeStore.setState({ modalImage: imageUrl })
+                              }
+                              reader.readAsDataURL(file)
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+                {youtubeMode && (
+                  <div className="order-5">
+                    <IconButton
+                      iconName={youtubePlaying ? '24/PauseAlt' : '24/Video'}
+                      isProcessing={false}
+                      onClick={() =>
+                        settingsStore.setState({
+                          youtubePlaying: !youtubePlaying,
+                        })
+                      }
+                    />
+                  </div>
+                )}
+                {slideMode && (
+                  <div className="order-5">
+                    <IconButton
+                      iconName="24/FrameEffect"
+                      isProcessing={false}
+                      onClick={() =>
+                        menuStore.setState({ slideVisible: !slideVisible })
+                      }
+                      disabled={slidePlaying}
+                    />
+                  </div>
+                )}
+                <div className="order-6">
                   <IconButton
-                    iconName={youtubePlaying ? '24/PauseAlt' : '24/Video'}
+                    iconName="game"
                     isProcessing={false}
+                    label={t('Game')}
+                    backgroundColor={
+                      gameVisible
+                        ? 'bg-secondary hover:bg-secondary-hover active:bg-secondary-press'
+                        : 'bg-primary hover:bg-primary-hover active:bg-primary-press disabled:bg-primary-disabled'
+                    }
                     onClick={() =>
+                      gameStore.getState().setGameVisible(!gameVisible)
+                    }
+                  />
+                </div>
+                <div className="order-7">
+                  <IconButton
+                    iconName="palette"
+                    isProcessing={false}
+                    onClick={() => setShowThemeSelector((v) => !v)}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* フローティングテーマピッカー */}
+          {showThemeSelector && (
+            <div
+              ref={themePanelRef}
+              className="absolute top-full mt-1 left-0 z-50 rounded-2xl p-3 shadow-2xl border border-white/10"
+              style={{
+                background: 'var(--color-base-dark)',
+                minWidth: '220px',
+              }}
+            >
+              <p
+                className="text-xs font-bold mb-2 opacity-60"
+                style={{ color: 'var(--color-text-base)' }}
+              >
+                {t('ColorTheme')}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {THEME_SWATCHES.map((theme) => (
+                  <button
+                    key={theme.id}
+                    onClick={() => {
                       settingsStore.setState({
-                        youtubePlaying: !youtubePlaying,
+                        colorTheme: theme.id as ThemeId,
                       })
-                    }
-                  />
-                </div>
-              )}
-              {slideMode && (
-                <div className="order-5">
-                  <IconButton
-                    iconName="24/FrameEffect"
-                    isProcessing={false}
-                    onClick={() =>
-                      menuStore.setState({ slideVisible: !slideVisible })
-                    }
-                    disabled={slidePlaying}
-                  />
-                </div>
-              )}
-            </>
+                      document.documentElement.setAttribute(
+                        'data-theme',
+                        theme.id
+                      )
+                      setShowThemeSelector(false)
+                    }}
+                    className={`rounded-xl p-2 text-left transition-all border-2 ${
+                      colorTheme === theme.id
+                        ? 'border-white/60'
+                        : 'border-transparent hover:border-white/20'
+                    }`}
+                    style={{
+                      background:
+                        colorTheme === theme.id
+                          ? 'rgba(255,255,255,0.1)'
+                          : 'rgba(255,255,255,0.04)',
+                    }}
+                  >
+                    <div className="flex gap-0.5 mb-1.5 rounded overflow-hidden h-5">
+                      <div
+                        className="flex-1"
+                        style={{ background: theme.primary }}
+                      />
+                      <div
+                        className="flex-1"
+                        style={{ background: theme.secondary }}
+                      />
+                      <div
+                        className="flex-1"
+                        style={{ background: theme.base }}
+                      />
+                    </div>
+                    <span
+                      className="text-xs font-medium"
+                      style={{ color: 'var(--color-text-base)' }}
+                    >
+                      {t(theme.nameKey)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>

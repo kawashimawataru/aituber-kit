@@ -20,6 +20,7 @@ const SpeechInput = () => {
   const deepgramApiKey = settingsStore((s) => s.deepgramApiKey)
   const deepgramAutoSend = settingsStore((s) => s.deepgramAutoSend)
   const deepgramEndpointingMs = settingsStore((s) => s.deepgramEndpointingMs)
+  const deepgramUtteranceEndMs = settingsStore((s) => s.deepgramUtteranceEndMs)
   const deepgramSilenceHoldMs = settingsStore((s) => s.deepgramSilenceHoldMs)
   const deepgramModel = settingsStore((s) => s.deepgramModel)
   const continuousMicListeningMode = settingsStore(
@@ -204,6 +205,27 @@ const SpeechInput = () => {
               onChange={(e) =>
                 settingsStore.setState({
                   deepgramEndpointingMs: Number(e.target.value),
+                })
+              }
+            />
+          </div>
+          <div className="my-6">
+            <div className="my-4 text-xl font-bold">
+              {t('DeepgramUtteranceEnd')}: {deepgramUtteranceEndMs}ms
+            </div>
+            <div className="my-2 text-sm whitespace-pre-wrap">
+              {t('DeepgramUtteranceEndInfo')}
+            </div>
+            <input
+              type="range"
+              min={500}
+              max={3000}
+              step={100}
+              value={deepgramUtteranceEndMs}
+              className="w-full input-range"
+              onChange={(e) =>
+                settingsStore.setState({
+                  deepgramUtteranceEndMs: Number(e.target.value),
                 })
               }
             />

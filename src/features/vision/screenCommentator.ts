@@ -20,6 +20,8 @@ export interface CommentaryOptions {
   // 会話コンテキスト
   systemPrompt?: string
   chatHistory?: Array<{ role: 'user' | 'assistant'; content: string }>
+  // 配信状況コンテキスト（画面・視聴者・配信者）
+  streamContext?: string
 }
 
 export async function generateScreenCommentary(
@@ -36,6 +38,7 @@ export async function generateScreenCommentary(
     azureEndpoint,
     systemPrompt,
     chatHistory,
+    streamContext,
   } = options
 
   const response = await fetch('/api/vision-commentary', {
@@ -52,6 +55,7 @@ export async function generateScreenCommentary(
       azureEndpoint,
       systemPrompt,
       chatHistory,
+      streamContext,
     }),
   })
 

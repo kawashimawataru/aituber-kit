@@ -27,9 +27,9 @@ export function buildDeepgramLiveUrl(options: {
   const {
     language,
     sampleRate,
-    model = 'nova-2',
-    endpointingMs = 300,
-    utteranceEndMs = 1000,
+    model = 'nova-3',
+    endpointingMs = 700,
+    utteranceEndMs = 1500,
   } = options
 
   const params = new URLSearchParams({

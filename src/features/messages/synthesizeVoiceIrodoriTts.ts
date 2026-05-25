@@ -8,7 +8,10 @@ export async function synthesizeVoiceIrodoriTtsApi(
   irodoriTtsVoice: string,
   irodoriTtsModel: string,
   irodoriTtsSpeed: number,
-  irodoriTtsInjectEmotion: boolean
+  irodoriTtsInjectEmotion: boolean,
+  irodoriTtsSeed: number,
+  irodoriTtsNumSteps: number,
+  irodoriTtsSwayCoeff: number = 0
 ) {
   const input = applyIrodoriEmotionToText(
     talk.message,
@@ -29,6 +32,9 @@ export async function synthesizeVoiceIrodoriTtsApi(
         irodoriTtsVoice,
         irodoriTtsModel,
         irodoriTtsSpeed,
+        irodoriTtsSeed,
+        irodoriTtsNumSteps,
+        irodoriTtsSwayCoeff,
       }),
     })
 

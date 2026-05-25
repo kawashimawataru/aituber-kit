@@ -135,7 +135,79 @@ export function extractSentenceForVoice(
   if (voice === 'stylebertvits2') {
     return extractSentenceStyleBertVits2(text)
   }
+  // IrodoriTTS: split at sentence endings only (no comma splits)
+  // The server handles internal 。！？ splitting via split_sentences=True
+  if (voice === 'irodoritts') {
+    return extractSentenceSentenceEnd(text)
+  }
   return extractSentenceDefault(text)
+}
+
+export type TtsSplitMode = 'auto' | 'punctuation' | 'sentence' | 'all'
+
+/**
+ * 句読点区切り: 、。！？ など読点・句点どちらでも区切る（文字数しきい値なし）
+ */
+export function extractSentencePunctuation(text: string): {
+  sentence: string
+  remainingText: string
+} {
+  const m = text.match(/^(.+?[、，,。．.!?！？\n])/)
+  if (m?.[0]) {
+    return {
+      sentence: m[0],
+      remainingText: text.slice(m[0].length).trimStart(),
+    }
+  }
+  return { sentence: '', remainingText: text }
+}
+
+/**
+ * 文末区切り: 。！？ のみ（読点では切らない）
+ */
+export function extractSentenceSentenceEnd(text: string): {
+  sentence: string
+  remainingText: string
+} {
+  const m = text.match(/^(.+?[。．.!?！？\n])/)
+  if (m?.[0]) {
+    return {
+      sentence: m[0],
+      remainingText: text.slice(m[0].length).trimStart(),
+    }
+  }
+  return { sentence: '', remainingText: text }
+}
+
+/**
+ * 一括送信: ストリーム完了まで蓄積し、done 時に一度に送る
+ */
+export function extractSentenceAll(_text: string): {
+  sentence: string
+  remainingText: string
+} {
+  return { sentence: '', remainingText: _text }
+}
+
+/**
+ * モードと音声エンジンに基づいて文を切り出す
+ */
+export function extractSentenceByMode(
+  text: string,
+  mode: TtsSplitMode,
+  voice: string
+): { sentence: string; remainingText: string } {
+  switch (mode) {
+    case 'punctuation':
+      return extractSentencePunctuation(text)
+    case 'sentence':
+      return extractSentenceSentenceEnd(text)
+    case 'all':
+      return extractSentenceAll(text)
+    case 'auto':
+    default:
+      return extractSentenceForVoice(text, voice)
+  }
 }
 
 /**

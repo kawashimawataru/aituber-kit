@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import { MessageInput } from '@/components/messageInput'
 import homeStore from '@/features/stores/home'
 import settingsStore from '@/features/stores/settings'
@@ -30,6 +30,11 @@ export const MessageInputContainer = ({ onChatProcessStart }: Props) => {
     startListening,
     stopListening,
   } = useVoiceRecognition({ onChatProcessStart })
+
+  // ユーザー発話テキストをhomeStoreに同期（UserSpeechDisplay用）
+  useEffect(() => {
+    homeStore.setState({ displayUserSpeech: userMessage })
+  }, [userMessage])
 
   const handleContinuousMicChange = useCallback(
     async (enabled: boolean) => {

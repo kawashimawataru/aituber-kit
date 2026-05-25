@@ -3,7 +3,7 @@ import { ButtonHTMLAttributes } from 'react'
 import Image from 'next/image'
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
-  iconName: keyof KnownIconType | 'screen-share' | 'stop'
+  iconName: keyof KnownIconType | 'screen-share' | 'stop' | 'game' | 'palette'
   isProcessing: boolean
   isProcessingIcon?: keyof KnownIconType
   label?: string
@@ -39,6 +39,16 @@ export const IconButton = ({
         />
       ) : iconName === 'stop' ? (
         <Image src="/images/icons/stop.svg" alt="stop" width={24} height={24} />
+      ) : iconName === 'game' ? (
+        <span style={{ fontSize: 20, lineHeight: 1 }}>♟</span>
+      ) : iconName === 'palette' ? (
+        <div
+          className="w-6 h-6 rounded-full"
+          style={{
+            background: 'var(--color-primary)',
+            boxShadow: '0 0 0 2px rgba(255,255,255,0.35)',
+          }}
+        />
       ) : (
         <pixiv-icon name={iconName as any} scale="1" />
       )}

@@ -7,9 +7,11 @@ import CoStreamingSettings from './coStreamingSettings'
 import MessageReceiverSetting from './messageReceiver'
 import PresetQuestions from './presetQuestions'
 import ScreenCommentarySettings from './screenCommentarySettings'
+import settingsStore from '@/features/stores/settings'
 
 const Other = () => {
   const { t } = useTranslation()
+  const enableFloatingComments = settingsStore((s) => s.enableFloatingComments)
 
   return (
     <>
@@ -22,6 +24,33 @@ const Other = () => {
           className="mr-2"
         />
         <h2 className="text-2xl font-bold">{t('OtherSettings')}</h2>
+      </div>
+
+      {/* 流れるコメント設定 */}
+      <div className="mb-8">
+        <h3 className="text-xl font-bold mb-2">{t('FloatingCommentsTitle')}</h3>
+        <p className="text-sm text-gray-500 mb-3">
+          {t('FloatingCommentsDesc')}
+        </p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() =>
+              settingsStore.setState({
+                enableFloatingComments: !enableFloatingComments,
+              })
+            }
+            className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${
+              enableFloatingComments
+                ? 'bg-primary hover:bg-primary-hover text-white'
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+            }`}
+          >
+            {enableFloatingComments ? t('StatusOn') : t('StatusOff')}
+          </button>
+          <span className="text-sm text-gray-500">
+            {t('FloatingCommentsHint')}
+          </span>
+        </div>
       </div>
 
       <AdvancedSettings />

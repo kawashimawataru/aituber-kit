@@ -6,6 +6,7 @@ import homeStore from '@/features/stores/home'
 import { useTranslation } from 'react-i18next'
 import { useSilenceDetection } from './useSilenceDetection'
 import { SpeakQueue } from '@/features/messages/speakQueue'
+import { updateSituation } from '@/features/chat/situationModel'
 
 /**
  * ブラウザの音声認識APIを使用するためのカスタムフック
@@ -414,6 +415,7 @@ export function useBrowserSpeechRecognition(
       console.log('🗣️ 音声入力を検出しました（onspeechstart）')
       // ここではタイマーをリセットするだけで、speechDetectedRefは設定しない
       updateSpeechTimestamp()
+      updateSituation({ humanSpeaking: true })
     }
 
     // 音量レベル追跡用変数
@@ -451,6 +453,7 @@ export function useBrowserSpeechRecognition(
       console.log(
         '🛑 音声入力が終了しました（onspeechend）。無音検出タイマーが動作中です。'
       )
+      updateSituation({ humanSpeaking: false })
     }
 
     // 音声認識終了時

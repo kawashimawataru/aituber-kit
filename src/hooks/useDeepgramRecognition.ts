@@ -1,4 +1,11 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import settingsStore from '@/features/stores/settings'
 import toastStore from '@/features/stores/toast'
@@ -31,6 +38,7 @@ export function useDeepgramRecognition(
   const deepgramAutoSend = settingsStore((s) => s.deepgramAutoSend)
   const deepgramEndpointingMs = settingsStore((s) => s.deepgramEndpointingMs)
   const deepgramModel = settingsStore((s) => s.deepgramModel)
+  const deepgramUtteranceEndMs = settingsStore((s) => s.deepgramUtteranceEndMs)
   const deepgramSilenceHoldMs = settingsStore((s) => s.deepgramSilenceHoldMs)
   const continuousMicListeningMode = settingsStore(
     (s) => s.continuousMicListeningMode
@@ -45,6 +53,7 @@ export function useDeepgramRecognition(
   const alwaysOnStreamRef = useRef<MediaStream | null>(null)
   const pcmContextRef = useRef<AudioContext | null>(null)
   const pcmProcessorRef = useRef<ScriptProcessorNode | null>(null)
+  const pcmWorkletRef = useRef<AudioWorkletNode | null>(null)
   const pcmSourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
   const alwaysOnContextRef = useRef<AudioContext | null>(null)
   const alwaysOnAnalyserRef = useRef<AnalyserNode | null>(null)
@@ -58,6 +67,7 @@ export function useDeepgramRecognition(
   const confirmedRef = useRef('')
   const partialRef = useRef('')
   const authKeyRef = useRef<string | null>(null)
+  const stopListeningRef = useRef<(() => Promise<void>) | null>(null)
 
   const [isTranscribing, setIsTranscribing] = useState(false)
 
@@ -84,6 +94,15 @@ export function useDeepgramRecognition(
 
   const stopPcmPipeline = useCallback(() => {
     stopSilenceWatcher()
+    if (pcmWorkletRef.current) {
+      try {
+        pcmWorkletRef.current.disconnect()
+      } catch {
+        // ignore
+      }
+      pcmWorkletRef.current.port.onmessage = null
+      pcmWorkletRef.current = null
+    }
     if (pcmProcessorRef.current) {
       try {
         pcmProcessorRef.current.disconnect()
@@ -317,6 +336,7 @@ export function useDeepgramRecognition(
         sampleRate,
         model: deepgramModel,
         endpointingMs: deepgramEndpointingMs,
+        utteranceEndMs: deepgramUtteranceEndMs,
       })
 
       const ws = new WebSocket(wsUrl, ['token', authKey])
@@ -353,10 +373,8 @@ export function useDeepgramRecognition(
 
       const source = pcmContext.createMediaStreamSource(stream)
       pcmSourceRef.current = source
-      const processor = pcmContext.createScriptProcessor(4096, 1, 1)
-      pcmProcessorRef.current = processor
 
-      processor.onaudioprocess = (ev) => {
+      const sendPcm = (samples: Float32Array) => {
         if (
           !utteranceActiveRef.current ||
           !wsRef.current ||
@@ -364,26 +382,51 @@ export function useDeepgramRecognition(
         ) {
           return
         }
-        const input = ev.inputBuffer.getChannelData(0)
-        const int16 = float32ToInt16(input)
         try {
-          wsRef.current.send(int16.buffer)
+          wsRef.current.send(float32ToInt16(samples).buffer)
         } catch {
           // ignore
         }
       }
 
-      source.connect(processor)
-      const mute = pcmContext.createGain()
-      mute.gain.value = 0
-      processor.connect(mute)
-      mute.connect(pcmContext.destination)
+      let useWorklet = false
+      try {
+        await pcmContext.audioWorklet.addModule(
+          '/audio/deepgram-pcm-processor.js'
+        )
+        const worklet = new AudioWorkletNode(
+          pcmContext,
+          'deepgram-pcm-processor'
+        )
+        pcmWorkletRef.current = worklet
+        worklet.port.onmessage = (ev: MessageEvent<Float32Array>) => {
+          sendPcm(ev.data)
+        }
+        source.connect(worklet)
+        useWorklet = true
+      } catch {
+        // ignore — fall through to ScriptProcessor
+      }
+
+      if (!useWorklet) {
+        const processor = pcmContext.createScriptProcessor(4096, 1, 1)
+        pcmProcessorRef.current = processor
+        processor.onaudioprocess = (ev) => {
+          sendPcm(ev.inputBuffer.getChannelData(0))
+        }
+        source.connect(processor)
+        const mute = pcmContext.createGain()
+        mute.gain.value = 0
+        processor.connect(mute)
+        mute.connect(pcmContext.destination)
+      }
     },
     [
       deepgramApiKey,
       selectLanguage,
       deepgramModel,
       deepgramEndpointingMs,
+      deepgramUtteranceEndMs,
       handleDeepgramMessage,
       finalizeUtterance,
       startSilenceWatcher,
@@ -478,7 +521,10 @@ export function useDeepgramRecognition(
     authKeyRef.current = null
     confirmedRef.current = ''
     partialRef.current = ''
-    setUserMessage('')
+    // setUserMessage は呼ばない:
+    //  - STT テキストがあれば finalizeUtterance が既に setUserMessage(text) 済み
+    //  - 手入力テキストはここで消してはいけない
+    //  - 新しい発話が始まる際は beginUtteranceStream が setUserMessage('') を呼ぶ
   }, [finalizeUtterance, stopAlwaysOnLoop])
 
   const startListening = useCallback(async () => {
@@ -572,11 +618,18 @@ export function useDeepgramRecognition(
     return utteranceActiveRef.current
   }, [continuousMicListeningMode])
 
+  // Keep ref current so the unmount effect always calls the latest version
+  // without needing stopListening in its deps (which caused spurious cleanup
+  // whenever deepgramAutoSend toggled and rebuilt the callback chain).
+  useLayoutEffect(() => {
+    stopListeningRef.current = stopListening
+  })
+
   useEffect(() => {
     return () => {
-      void stopListening()
+      void stopListeningRef.current?.()
     }
-  }, [stopListening])
+  }, []) // empty deps — only fires on component unmount
 
   return useMemo(
     () => ({

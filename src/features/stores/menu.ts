@@ -15,6 +15,7 @@ type SettingsTabKey =
   | 'idle'
   | 'kiosk'
   | 'other'
+  | 'projects'
 interface MenuState {
   showWebcam: boolean
   showCapture: boolean

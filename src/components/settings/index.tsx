@@ -19,6 +19,7 @@ import MemorySettings from './memorySettings'
 import PresenceSettings from './presenceSettings'
 import IdleSettings from './idleSettings'
 import KioskSettings from './kioskSettings'
+import Projects from './projects'
 
 type Props = {
   onClickClose: () => void
@@ -65,6 +66,7 @@ type TabKey =
   | 'kiosk'
   | 'other'
   | 'speechInput'
+  | 'projects'
 
 // アイコンのパスマッピング
 const tabIconMapping: Record<TabKey, string> = {
@@ -82,6 +84,7 @@ const tabIconMapping: Record<TabKey, string> = {
   kiosk: '/images/setting-icons/kiosk-settings.svg',
   other: '/images/setting-icons/other-settings.svg',
   speechInput: '/images/setting-icons/microphone-settings.svg',
+  projects: '/images/setting-icons/projects.svg',
 }
 
 const Main = () => {
@@ -172,6 +175,10 @@ const Main = () => {
       key: 'other',
       label: t('OtherSettings'),
     },
+    {
+      key: 'projects',
+      label: t('ProjectsSettings'),
+    },
   ]
 
   const renderTabContent = () => {
@@ -204,6 +211,8 @@ const Main = () => {
         return <Other />
       case 'speechInput':
         return <SpeechInput />
+      case 'projects':
+        return <Projects />
     }
   }
 

@@ -27,6 +27,12 @@ import { MemoryServiceInitializer } from '@/components/memoryServiceInitializer'
 import toastStore from '@/features/stores/toast'
 import { usePresetLoader } from '@/features/presets/usePresetLoader'
 import { useLive2DEnabled } from '@/hooks/useLive2DEnabled'
+import GameOverlay from '@/components/games/GameOverlay'
+import FloatingComments from '@/components/FloatingComments'
+import UserSpeechDisplay from '@/components/UserSpeechDisplay'
+import VocabHintOverlay from '@/components/VocabHintOverlay'
+import PianoDisplay from '@/components/PianoDisplay'
+import DrawingGameOverlay from '@/features/projects/drawingGame/DrawingGameOverlay'
 
 const Home = () => {
   const webcamStatus = homeStore((s) => s.webcamStatus)
@@ -137,6 +143,12 @@ const Home = () => {
       <div className="absolute top-4 left-4 z-30">
         <IdleManager />
       </div>
+      <FloatingComments />
+      <UserSpeechDisplay />
+      <VocabHintOverlay />
+      <PianoDisplay />
+      <DrawingGameOverlay />
+      <GameOverlay />
       <KioskOverlay />
     </div>
   )

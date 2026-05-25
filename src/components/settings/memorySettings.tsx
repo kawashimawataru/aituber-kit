@@ -21,6 +21,8 @@ import { extractTextContent } from '@/features/memory/memoryStoreSync'
 import { Message } from '@/features/messages/messages'
 import { messageSelectors } from '@/features/messages/messageSelectors'
 import { useRestrictedMode } from '@/hooks/useRestrictedMode'
+import { getConversationLogService } from '@/features/memory/conversationLogService'
+import ConversationCalendar from './ConversationCalendar'
 
 /** Close icon SVG component */
 function CloseIcon(): JSX.Element {
@@ -82,6 +84,8 @@ const MemorySettings = () => {
   const [isSearching, setIsSearching] = useState<boolean>(false)
   const [hasSearched, setHasSearched] = useState<boolean>(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [convLogTotalDays, setConvLogTotalDays] = useState(0)
+  const [isClearingConvLog, setIsClearingConvLog] = useState(false)
 
   // APIキーが設定されているか
   const hasApiKey = Boolean(openaiKey)
@@ -612,6 +616,41 @@ const MemorySettings = () => {
               </div>
             )}
           </div>
+        </div>
+
+        {/* ===== 会話カレンダーセクション ===== */}
+        <div className="border-t border-gray-300 pt-6 my-6">
+          <div className="flex items-center mb-2">
+            <span className="text-xl mr-2">📅</span>
+            <h3 className="text-xl font-bold">{t('ConvLogCalendar')}</h3>
+          </div>
+          <p className="my-2 text-sm text-gray-600 whitespace-pre-wrap">
+            {t('ConvLogCalendarInfo')}
+          </p>
+          <div className="my-4">
+            <ConversationCalendar onTotalDaysChange={setConvLogTotalDays} />
+          </div>
+          {convLogTotalDays > 0 && (
+            <div className="mt-4">
+              <TextButton
+                onClick={async () => {
+                  const confirmed = window.confirm(t('ConvLogClearConfirm'))
+                  if (!confirmed) return
+                  setIsClearingConvLog(true)
+                  try {
+                    const svc = getConversationLogService()
+                    await svc.clearAll()
+                    setConvLogTotalDays(0)
+                  } finally {
+                    setIsClearingConvLog(false)
+                  }
+                }}
+                disabled={isClearingConvLog}
+              >
+                {isClearingConvLog ? '...' : t('ConvLogClearAll')}
+              </TextButton>
+            </div>
+          )}
         </div>
 
         {/* ===== 会話履歴セクション ===== */}

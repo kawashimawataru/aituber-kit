@@ -2,6 +2,9 @@ import settingsStore from '@/features/stores/settings'
 import { processAIResponse } from '../chat/handlers'
 import homeStore from '@/features/stores/home'
 import { messageSelectors } from '../messages/messageSelectors'
+import { dispatchToGame } from '@/features/games/viewerGameBus'
+import { addBatchViewerFloatingComments } from '@/features/floatingComments/floatingCommentStore'
+import { pushViewerComment } from '@/features/streaming/streamContext'
 
 // getLiveChatId のキャッシュ（配信中にChat IDは変わらないため）
 let liveChatIdCache: { liveId: string; chatId: string } | null = null
@@ -265,6 +268,17 @@ export const fetchAndProcessComments = async (
         )
       }
 
+      // 視聴者コメントを流れるコメントとして表示
+      addBatchViewerFloatingComments(youtubeComments)
+
+      // ストリームコンテキストに視聴者コメントを記録
+      youtubeComments.forEach((c) =>
+        pushViewerComment(c.userName, c.userComment)
+      )
+
+      // ゲーム投票として処理されたコメントを除外
+      youtubeComments = youtubeComments.filter((c) => !dispatchToGame(c))
+
       // Phase 3: コメント有無に応じてワークフロー実行
       const result = await callContinuationApi({
         ss,
@@ -318,6 +332,15 @@ export const fetchAndProcessComments = async (
           settingsStore.setState({ youtubeNextPageToken: token })
       )
     }
+
+    // 視聴者コメントを流れるコメントとして表示
+    addBatchViewerFloatingComments(youtubeComments)
+
+    // ストリームコンテキストに視聴者コメントを記録
+    youtubeComments.forEach((c) => pushViewerComment(c.userName, c.userComment))
+
+    // ゲーム投票として処理されたコメントを除外
+    youtubeComments = youtubeComments.filter((c) => !dispatchToGame(c))
 
     // ランダムなコメントを選択して送信
     if (youtubeComments.length > 0) {

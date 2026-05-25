@@ -30,6 +30,7 @@ import {
   containsEnglish,
 } from '@/utils/textProcessing'
 import { stripSpeakControlTags } from '@/utils/speakControlTags'
+import { addAiFloatingComment } from '@/features/floatingComments/floatingCommentStore'
 
 const speakQueue = SpeakQueue.getInstance()
 const prefetchPipeline = PrefetchSpeakPipeline.getInstance()
@@ -143,7 +144,10 @@ async function synthesizeVoice(
           ss.irodoriTtsVoice,
           ss.irodoriTtsModel,
           ss.irodoriTtsSpeed,
-          ss.irodoriTtsInjectEmotion
+          ss.irodoriTtsInjectEmotion,
+          ss.irodoriTtsSeed,
+          ss.irodoriTtsNumSteps,
+          ss.irodoriTtsSwayCoeff
         )
       case 'aivis_speech':
         return await synthesizeVoiceAivisSpeechApi(
@@ -253,6 +257,11 @@ const createSpeakCharacter = () => {
         onComplete()
       }
       return
+    }
+
+    // AI発話テキストを流れるコメントとして表示
+    if (processedMessage) {
+      addAiFloatingComment(processedMessage)
     }
 
     if (processedMessage) {

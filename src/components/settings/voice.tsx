@@ -16,6 +16,7 @@ import {
 import type { TtsSplitMode } from '@/utils/ttsSentenceSplit'
 import { getOpenAITTSModels } from '@/features/constants/aiModels'
 import { testVoice } from '@/features/messages/speakCharacter'
+import { EMOTIONS, EmotionType } from '@/features/messages/messages'
 import settingsStore from '@/features/stores/settings'
 import { Link } from '../link'
 import { TextButton } from '../textButton'
@@ -117,6 +118,9 @@ const Voice = () => {
   const [speakers_aivis, setSpeakers_aivis] = useState<Array<any>>([])
   const [speakers_voicevox, setSpeakers_voicevox] = useState<Array<any>>([])
   const [customVoiceText, setCustomVoiceText] = useState<string>('')
+  const [testEmotion, setTestEmotion] = useState<EmotionType>('neutral')
+  const [injectEmotionTagToTest, setInjectEmotionTagToTest] =
+    useState<boolean>(true)
   const [sbv2Models, setSbv2Models] = useState<
     Array<{
       modelId: string
@@ -1815,6 +1819,36 @@ const Voice = () => {
       {/* カスタムテキスト入力と統合テストボタン */}
       <div className="mt-10 p-4 bg-gray-50 rounded-lg">
         <div className="mb-4 text-xl font-bold">{t('TestVoiceSettings')}</div>
+
+        <div className="mb-3">
+          <div className="font-bold text-sm mb-2">感情タグ（テスト用）</div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <ToggleSwitch
+              enabled={injectEmotionTagToTest}
+              onChange={(enabled) => setInjectEmotionTagToTest(enabled)}
+            />
+            <span className="text-sm text-gray-600 select-none">
+              ONのとき、先頭に <code>[{testEmotion}]</code> を付けて試聴します
+            </span>
+          </div>
+          <div className="flex gap-2 flex-wrap mt-2">
+            {EMOTIONS.map((e) => (
+              <button
+                key={e}
+                onClick={() => setTestEmotion(e)}
+                className={[
+                  'px-3 py-1 rounded-full text-xs border transition-colors',
+                  testEmotion === e
+                    ? 'bg-primary text-theme border-primary'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400',
+                ].join(' ')}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="flex items-center">
           <input
             className="flex-1 px-4 py-2 bg-white hover:bg-white-hover rounded-lg"
@@ -1826,7 +1860,12 @@ const Voice = () => {
         </div>
         <div className="flex items-center mt-4">
           <TextButton
-            onClick={() => testVoice(selectVoice, customVoiceText)}
+            onClick={() => {
+              const text = injectEmotionTagToTest
+                ? `[${testEmotion}] ${customVoiceText}`
+                : customVoiceText
+              testVoice(selectVoice, text)
+            }}
             disabled={!customVoiceText}
           >
             {t('TestSelectedVoice')}

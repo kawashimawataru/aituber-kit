@@ -481,11 +481,22 @@ export const testVoice = async (voiceType: AIVoice, customText?: string) => {
     azure: 'Azure TTSを使用します',
   }
 
-  const message = customText || defaultMessages[voiceType]
+  const rawMessage = customText || defaultMessages[voiceType]
+
+  // テスト入力では speakCharacter 経由の前処理が走らないため、
+  // 先頭の感情タグを解釈して talk.emotion に反映し、テキストからは除去する。
+  const emotionMatch = rawMessage.match(
+    /^\s*\[(neutral|happy|angry|sad|relaxed|surprised)\]\s*/i
+  )
+  const emotionFromTag = (emotionMatch?.[1]?.toLowerCase() ??
+    'neutral') as Talk['emotion']
+  const messageWithoutLeadingEmotion = emotionMatch
+    ? rawMessage.slice(emotionMatch[0].length)
+    : rawMessage
 
   const talk: Talk = {
-    message,
-    emotion: 'neutral',
+    message: preprocessMessage(messageWithoutLeadingEmotion, ss) ?? '',
+    emotion: emotionFromTag,
   }
 
   try {

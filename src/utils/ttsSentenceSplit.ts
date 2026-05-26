@@ -188,6 +188,7 @@ export const IRODORI_MIN_MEANINGFUL_CHARS = 5
  * IrodoriTTS 向け:
  * - 句点（。！？）のみで区切る
  * - 意味文字数が IRODORI_MIN_MEANINGFUL_CHARS 未満の短文は次の文と結合する
+ * - 「はぁ！」の後に「？」だけの断片が来てもさらに結合し続ける
  * - これにより「はぁ！」「ふん。」など短文単体送信による音声品質劣化を防ぐ
  */
 export function extractSentenceIrodoriTts(text: string): {
@@ -197,22 +198,32 @@ export function extractSentenceIrodoriTts(text: string): {
   const first = extractSentenceSentenceEnd(text)
   if (!first.sentence) return first
 
-  const meaningful = first.sentence.replace(/[!?.,。、！？．\s]+/g, '')
-  if (meaningful.length >= IRODORI_MIN_MEANINGFUL_CHARS) {
+  const firstMeaningful = first.sentence.replace(/[!?.,。、！？．\s]+/g, '')
+  if (firstMeaningful.length >= IRODORI_MIN_MEANINGFUL_CHARS) {
     return first
   }
 
-  // 短文: 次の文も取得して結合を試みる
-  const second = extractSentenceSentenceEnd(first.remainingText)
-  if (!second.sentence) {
-    // 次の完全文がまだ来ていない → バッファに戻す
-    return { sentence: '', remainingText: text }
+  // 短文: 意味文字数が足りるまで後続の文を結合する（最大3回）
+  let accumulated = first.sentence
+  let remaining = first.remainingText
+
+  for (let i = 0; i < 3; i++) {
+    const next = extractSentenceSentenceEnd(remaining)
+    if (!next.sentence) {
+      // 次の完全文がまだ来ていない → 全部バッファに戻す
+      return { sentence: '', remainingText: text }
+    }
+    accumulated = (accumulated + next.sentence).trim()
+    remaining = next.remainingText
+
+    const accMeaningful = accumulated.replace(/[!?.,。、！？．\s]+/g, '')
+    if (accMeaningful.length >= IRODORI_MIN_MEANINGFUL_CHARS) {
+      return { sentence: accumulated, remainingText: remaining }
+    }
   }
 
-  return {
-    sentence: (first.sentence + second.sentence).trim(),
-    remainingText: second.remainingText,
-  }
+  // 3回結合しても足りない場合はそのまま送る
+  return { sentence: accumulated, remainingText: remaining }
 }
 
 /**
@@ -233,6 +244,10 @@ export function extractSentenceByMode(
   mode: TtsSplitMode,
   voice: string
 ): { sentence: string; remainingText: string } {
+  // IrodoriTTS: sentence/auto モードでは常に短文マージ付き抽出を使う
+  if (voice === 'irodoritts' && (mode === 'sentence' || mode === 'auto')) {
+    return extractSentenceIrodoriTts(text)
+  }
   switch (mode) {
     case 'punctuation':
       return extractSentencePunctuation(text)

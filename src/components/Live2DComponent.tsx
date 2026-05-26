@@ -10,6 +10,38 @@ import toastStore from '@/features/stores/toast'
 // Register the Live2D render pipe with PixiJS (must happen before Application.init)
 extensions.add(Live2DPlugin)
 
+// Costume → parameter overrides injected every frame (Add-blend absolute values)
+const COSTUME_PARAMS: Record<string, { id: string; value: number }[]> = {
+  CostumeV0000: [
+    { id: 'v0000_Param8', value: 1 },
+    { id: 'v0050_Param18', value: 0 },
+    { id: 'V0100Param44', value: -1 },
+    { id: 'V0101_Param3', value: -1 },
+    { id: 'Param28', value: 0 },
+  ],
+  CostumeV0052: [
+    { id: 'v0000_Param8', value: 0 },
+    { id: 'v0050_Param18', value: 1 },
+    { id: 'V0100Param44', value: -1 },
+    { id: 'V0101_Param3', value: -1 },
+    { id: 'Param28', value: 0 },
+  ],
+  CostumeV0100: [
+    { id: 'v0000_Param8', value: 0 },
+    { id: 'v0050_Param18', value: 0 },
+    { id: 'V0100Param44', value: 0 },
+    { id: 'V0101_Param3', value: 0 },
+    { id: 'Param28', value: 0 },
+  ],
+  CostumeV0101: [
+    { id: 'v0000_Param8', value: 0 },
+    { id: 'v0050_Param18', value: 0 },
+    { id: 'V0100Param44', value: -1 },
+    { id: 'V0101_Param3', value: 1 },
+    { id: 'Param28', value: 0 },
+  ],
+}
+
 console.log('Live2DComponent module loaded')
 
 const setModelPosition = (
@@ -151,6 +183,9 @@ const Live2DComponent = (): JSX.Element => {
         ticker: Ticker.shared,
         autoHitTest: false,
         autoFocus: false,
+        lipSyncGain: 4.0,
+        lipSyncWeight: 0.8,
+        breathDepth: 1.2,
       })
 
       currentApp.stage.addChild(newModel as unknown as Container)
@@ -162,6 +197,31 @@ const Live2DComponent = (): JSX.Element => {
       // Set live2dViewer immediately so Live2DHandler can use it.
       // The useEffect will later enrich it with position controls via Object.assign.
       homeStore.setState({ live2dViewer: newModel })
+
+      // Low-priority ticker to inject costume parameters each frame,
+      // overriding whatever the expression system does to costume-specific params.
+      const costumeTicker = () => {
+        const costume = settingsStore.getState().live2dCostume
+        if (
+          !costume ||
+          !modelRef.current ||
+          (modelRef.current as any).destroyed
+        )
+          return
+        const params = COSTUME_PARAMS[costume]
+        if (!params) return
+        try {
+          const coreModel = (modelRef.current as any).internalModel?.coreModel
+          if (!coreModel) return
+          for (const { id, value } of params) {
+            coreModel.setParameterValueById(id, value, 1.0)
+          }
+        } catch {
+          // ignore frame errors
+        }
+      }
+      Ticker.shared.add(costumeTicker, undefined, -25)
+      ;(newModel as any).__costumeTicker = costumeTicker
 
       await Live2DHandler.resetToIdle()
     } catch (error) {
@@ -189,6 +249,8 @@ const Live2DComponent = (): JSX.Element => {
       homeStore.setState({ live2dViewer: null })
       if (modelRef.current) {
         try {
+          const ticker = (modelRef.current as any).__costumeTicker
+          if (ticker) Ticker.shared.remove(ticker)
           modelRef.current.destroy()
         } catch {
           // ignore teardown errors
@@ -210,6 +272,8 @@ const Live2DComponent = (): JSX.Element => {
       // 既存のモデルがある場合は先に削除
       if (modelRef.current) {
         app.stage.removeChild(modelRef.current as unknown as Container)
+        const ticker = (modelRef.current as any).__costumeTicker
+        if (ticker) Ticker.shared.remove(ticker)
         modelRef.current.destroy()
         modelRef.current = null
         setModel(null)

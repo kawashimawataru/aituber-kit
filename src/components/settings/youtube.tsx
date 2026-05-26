@@ -16,6 +16,7 @@ const YouTube = () => {
   const onecommePort = settingsStore((s) => s.onecommePort)
   const externalLinkageMode = settingsStore((s) => s.externalLinkageMode)
   const selectAIService = settingsStore((s) => s.selectAIService)
+  const twitchMode = settingsStore((s) => s.twitchMode)
 
   const youtubeCommentInterval = settingsStore((s) => s.youtubeCommentInterval)
   const conversationContinuityMode = settingsStore(
@@ -51,6 +52,13 @@ const YouTube = () => {
 
     if (!youtubeMode) {
       settingsStore.setState({ youtubePlaying: false })
+    }
+  }
+
+  const handleChangeTwitchMode = (enabled: boolean) => {
+    settingsStore.setState({ twitchMode: enabled })
+    if (!enabled) {
+      settingsStore.setState({ twitchPlaying: false })
     }
   }
 
@@ -489,6 +497,41 @@ const YouTube = () => {
             </>
           )}
         </div>
+      </div>
+
+      {/* Twitch section */}
+      <div className="mt-8">
+        <div className="flex items-center mb-6">
+          <h2 className="text-2xl font-bold">{t('TwitchSettings')}</h2>
+        </div>
+        <div className="mb-4 text-xl font-bold">{t('TwitchMode')}</div>
+        <div className="my-2">
+          <ToggleSwitch
+            enabled={twitchMode}
+            onChange={handleChangeTwitchMode}
+          />
+        </div>
+        {twitchMode && (
+          <div className="mt-4">
+            <div className="my-2 text-sm whitespace-pre-wrap">
+              {t('TwitchModeInfo')}
+            </div>
+            <div className="my-4 text-xl font-bold">{t('OneCommePort')}</div>
+            <input
+              className="text-ellipsis px-4 py-2 w-full sm:w-col-span-2 bg-white hover:bg-white-hover rounded-lg"
+              type="number"
+              placeholder="11180"
+              value={onecommePort}
+              onChange={(e) => {
+                const parsed = Number(e.target.value)
+                const clamped = Number.isFinite(parsed)
+                  ? Math.min(Math.max(parsed, 1), 65535)
+                  : 11180
+                settingsStore.setState({ onecommePort: clamped })
+              }}
+            />
+          </div>
+        )}
       </div>
     </>
   )

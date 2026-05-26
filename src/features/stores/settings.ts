@@ -86,6 +86,7 @@ interface Live2DSettings {
   angryMotionGroup: string
   relaxedMotionGroup: string
   surprisedMotionGroup: string
+  live2dCostume: string
 }
 
 interface ModelProvider extends Live2DSettings {
@@ -167,6 +168,8 @@ interface Integrations {
   conversationContinuityPromptSleep: string
   onecommePort: number
   youtubeCommentInterval: number
+  twitchMode: boolean
+  twitchPlaying: boolean
 }
 
 interface Character {
@@ -515,6 +518,8 @@ const getInitialValuesFromEnv = (): SettingsState => ({
     parseInt(process.env.NEXT_PUBLIC_ONECOMME_PORT || '11180') || 11180,
   youtubeCommentInterval:
     parseInt(process.env.NEXT_PUBLIC_YOUTUBE_COMMENT_INTERVAL || '10') || 10,
+  twitchMode: process.env.NEXT_PUBLIC_TWITCH_MODE === 'true' ? true : false,
+  twitchPlaying: false,
 
   // Character
   characterName: process.env.NEXT_PUBLIC_CHARACTER_NAME || 'CHARACTER',
@@ -898,6 +903,7 @@ const getInitialValuesFromEnv = (): SettingsState => ({
   angryMotionGroup: process.env.NEXT_PUBLIC_ANGRY_MOTION_GROUP || '',
   relaxedMotionGroup: process.env.NEXT_PUBLIC_RELAXED_MOTION_GROUP || '',
   surprisedMotionGroup: process.env.NEXT_PUBLIC_SURPRISED_MOTION_GROUP || '',
+  live2dCostume: '',
 })
 
 type PersistedSettingsState = Partial<SettingsState> & {

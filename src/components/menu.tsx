@@ -8,6 +8,7 @@ import settingsStore from '@/features/stores/settings'
 import slideStore from '@/features/stores/slide'
 import { AssistantText } from './assistantText'
 import { ChatLog } from './chatLog'
+import { VerticalChatLog } from './verticalChatLog'
 import { IconButton } from './iconButton'
 import Settings from './settings'
 import { Webcam } from './webcam'
@@ -49,6 +50,8 @@ export const Menu = () => {
   const customModel = settingsStore((s) => s.customModel)
   const youtubeMode = settingsStore((s) => s.youtubeMode)
   const youtubePlaying = settingsStore((s) => s.youtubePlaying)
+  const twitchMode = settingsStore((s) => s.twitchMode)
+  const twitchPlaying = settingsStore((s) => s.twitchPlaying)
   const slideMode = settingsStore((s) => s.slideMode)
   const slideVisible = menuStore((s) => s.slideVisible)
   const chatLog = homeStore((s) => s.chatLog)
@@ -97,6 +100,7 @@ export const Menu = () => {
     HIDDEN: 0, // 非表示
     ASSISTANT: 1, // アシスタントテキスト
     CHAT_LOG: 2, // 会話ログ
+    VERTICAL: 3, // 縦型配信（LINE風）
   } as const
 
   const [chatLogMode, setChatLogMode] = useState<number>(
@@ -279,11 +283,13 @@ export const Menu = () => {
                         ? '24/CommentOutline'
                         : chatLogMode === CHAT_LOG_MODE.ASSISTANT
                           ? '24/CommentFill'
-                          : '24/Close'
+                          : chatLogMode === CHAT_LOG_MODE.VERTICAL
+                            ? '24/CommentFill'
+                            : '24/Close'
                     }
                     label={t('ChatLog')}
                     isProcessing={false}
-                    onClick={() => setChatLogMode((prev) => (prev + 1) % 3)}
+                    onClick={() => setChatLogMode((prev) => (prev + 1) % 4)}
                   />
                 </div>
                 {!youtubeMode && (
@@ -344,6 +350,19 @@ export const Menu = () => {
                       onClick={() =>
                         settingsStore.setState({
                           youtubePlaying: !youtubePlaying,
+                        })
+                      }
+                    />
+                  </div>
+                )}
+                {twitchMode && (
+                  <div className="order-5">
+                    <IconButton
+                      iconName={twitchPlaying ? '24/PauseAlt' : '24/Video'}
+                      isProcessing={false}
+                      onClick={() =>
+                        settingsStore.setState({
+                          twitchPlaying: !twitchPlaying,
                         })
                       }
                     />
@@ -460,6 +479,7 @@ export const Menu = () => {
         {slideMode && slideVisible && <Slides markdown={markdownContent} />}
       </div>
       {chatLogMode === CHAT_LOG_MODE.CHAT_LOG && <ChatLog />}
+      {chatLogMode === CHAT_LOG_MODE.VERTICAL && <VerticalChatLog />}
       {showSettings && canAccessSettings && (
         <Settings onClickClose={() => setShowSettings(false)} />
       )}

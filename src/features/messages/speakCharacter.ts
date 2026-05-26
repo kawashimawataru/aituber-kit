@@ -29,7 +29,10 @@ import {
   asyncConvertEnglishToJapaneseReading,
   containsEnglish,
 } from '@/utils/textProcessing'
-import { stripSpeakControlTags } from '@/utils/speakControlTags'
+import {
+  stripMarkdownForTts,
+  stripSpeakControlTags,
+} from '@/utils/speakControlTags'
 import { addAiFloatingComment } from '@/features/floatingComments/floatingCommentStore'
 
 const speakQueue = SpeakQueue.getInstance()
@@ -49,13 +52,27 @@ export function preprocessMessage(
   message: string,
   settings: ReturnType<typeof settingsStore.getState>
 ): string | null {
+  const _raw = message // for logging
   // 前後の空白を削除
   let processed: string | null = message.trim()
-  if (!processed) return null
+  if (!processed) {
+    console.debug('[TTS] preprocessMessage: empty input, skip')
+    return null
+  }
 
   // 感情・モーション等の制御タグは TTS に読ませない
   processed = stripSpeakControlTags(processed)
-  if (!processed) return null
+  if (!processed) {
+    console.debug('[TTS] preprocessMessage: filtered (all control tags):', _raw)
+    return null
+  }
+
+  // マークダウン記法（**太字**、1. リスト等）を除去
+  processed = stripMarkdownForTts(processed)
+  if (!processed) {
+    console.debug('[TTS] preprocessMessage: filtered (all markdown):', _raw)
+    return null
+  }
 
   // Irodori-TTS は絵文字で感情制御するため削除しない
   if (settings.selectVoice !== 'irodoritts') {
@@ -73,7 +90,23 @@ export function preprocessMessage(
     )
 
   // 空文字列の場合はnullを返す
-  if (processed === '' || isOnlySymbols) return null
+  if (processed === '' || isOnlySymbols) {
+    console.debug('[TTS] preprocessMessage: filtered (symbols only):', _raw)
+    return null
+  }
+
+  // 意味のある文字がゼロのチャンクは TTS に送らない（isOnlySymbols を通過した念押し）
+  // ※ 文末フラグメント（「急」など 1 文字）を消さないよう閾値は 1 未満（= 0）にする
+  const meaningfulChars = processed.replace(
+    /[!?.,。、．，'"(){}[\]<>+=\-*\/\\|;:@#$%^&*_~！？（）「」『』【】〔〕［］｛｝〈〉《》｢｣。、．，：；＋－＊／＝＜＞％＆＾｜～＠＃＄＿"\s　]+/g,
+    ''
+  )
+  if (meaningfulChars.length < 1) {
+    console.debug('[TTS] preprocessMessage: filtered (no meaningful chars):', _raw)
+    return null
+  }
+
+  console.debug('[TTS] preprocessMessage: → TTS:', JSON.stringify(processed))
 
   // 英語から日本語への変換は次の条件のみ実行
   // 1. 設定でオンになっている

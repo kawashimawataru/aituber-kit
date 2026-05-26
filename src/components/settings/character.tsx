@@ -451,7 +451,7 @@ type EmotionFieldKey = (typeof emotionFields)[number]['key']
 
 const Live2DSettingsForm = () => {
   const store = settingsStore()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [currentModel, setCurrentModel] = useState<Live2DModel | null>(null)
   const [openDropdown, setOpenDropdown] = useState<EmotionFieldKey | null>(null)
 
@@ -525,8 +525,53 @@ const Live2DSettingsForm = () => {
     )
   }
 
+  const costumeExpressions = currentModel.expressions.filter((e) =>
+    e.startsWith('Costume')
+  )
+
   return (
     <div className="space-y-8">
+      {costumeExpressions.length > 0 && (
+        <div className="mb-6">
+          <div className="mb-4 text-xl font-bold">
+            {i18n.language === 'ja' ? '衣装チェンジ' : 'Costume Change'}
+          </div>
+          <div className="my-2 text-sm whitespace-pre-wrap">
+            {i18n.language === 'ja'
+              ? '表示する衣装を選択します。'
+              : 'Select the costume to display.'}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={`px-4 py-2 rounded-lg text-sm ${
+                !store.live2dCostume
+                  ? 'bg-primary text-theme'
+                  : 'bg-white hover:bg-white-hover'
+              }`}
+              onClick={() => settingsStore.setState({ live2dCostume: '' })}
+            >
+              {i18n.language === 'ja' ? 'デフォルト' : 'Default'}
+            </button>
+            {costumeExpressions.map((costume) => (
+              <button
+                key={costume}
+                type="button"
+                className={`px-4 py-2 rounded-lg text-sm ${
+                  store.live2dCostume === costume
+                    ? 'bg-primary text-theme'
+                    : 'bg-white hover:bg-white-hover'
+                }`}
+                onClick={() =>
+                  settingsStore.setState({ live2dCostume: costume })
+                }
+              >
+                {costume.replace('Costume', '')}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="mb-6">
         <div className="mb-4 text-xl font-bold">{t('Live2D.Emotions')}</div>
         <div className="my-2 text-sm whitespace-pre-wrap">

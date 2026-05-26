@@ -25,6 +25,11 @@ const useYoutube = ({ handleSendChat }: Params): UseYoutubeReturn => {
   const youtubeCommentInterval = settingsStore((s) => s.youtubeCommentInterval)
   const youtubeCommentSource = settingsStore((s) => s.youtubeCommentSource)
   const onecommePort = settingsStore((s) => s.onecommePort)
+  const twitchMode = settingsStore((s) => s.twitchMode)
+  const twitchPlaying = settingsStore((s) => s.twitchPlaying)
+
+  // どちらかのモードが再生中
+  const isStreamingPlaying = youtubePlaying || twitchPlaying
 
   // わんコメコメント用バッファ
   const commentBufferRef = useRef<YouTubeComment[]>([])
@@ -36,13 +41,15 @@ const useYoutube = ({ handleSendChat }: Params): UseYoutubeReturn => {
   // 多重実行防止用ref
   const isProcessingRef = useRef(false)
 
-  // わんコメ接続
+  // わんコメ接続: YouTube+onecomme または Twitchモード再生中に有効化
   const {
     isConnected: oneCommeConnected,
     isLoading: oneCommeLoading,
     error: oneCommeError,
   } = useOneComme({
-    enabled: youtubeCommentSource === 'onecomme' && youtubePlaying,
+    enabled:
+      (youtubeCommentSource === 'onecomme' && youtubePlaying) ||
+      (twitchMode && twitchPlaying),
     port: onecommePort,
     commentBufferRef,
   })
@@ -51,25 +58,32 @@ const useYoutube = ({ handleSendChat }: Params): UseYoutubeReturn => {
     const ss = settingsStore.getState()
     const hs = homeStore.getState()
 
+    const streamingActive =
+      (ss.youtubeMode && ss.youtubePlaying) ||
+      (ss.twitchMode && ss.twitchPlaying)
+
     if (
       isProcessingRef.current ||
       hs.chatProcessing ||
       hs.chatProcessingCount > 0 ||
-      !ss.youtubeMode ||
-      !ss.youtubePlaying
+      !streamingActive
     ) {
       return
     }
 
     isProcessingRef.current = true
     try {
-      if (ss.youtubeCommentSource === 'youtube-api') {
+      if (
+        ss.youtubeMode &&
+        ss.youtubePlaying &&
+        ss.youtubeCommentSource === 'youtube-api'
+      ) {
         // YouTube APIモード: 従来通り
         if (!ss.youtubeLiveId || !ss.youtubeApiKey) return
         console.log('Call fetchAndProcessComments !!!')
         await fetchAndProcessComments(handleSendChatRef.current)
       } else {
-        // わんコメモード: バッファをドレインして渡す
+        // わんコメモード (YouTube or Twitch): バッファをドレインして渡す
         const bufferedComments = [...commentBufferRef.current]
         commentBufferRef.current = []
         console.log(
@@ -88,7 +102,7 @@ const useYoutube = ({ handleSendChat }: Params): UseYoutubeReturn => {
   }, [])
 
   useEffect(() => {
-    if (!youtubePlaying) return
+    if (!isStreamingPlaying) return
     fetchAndProcessCommentsCallback()
 
     const intervalId = setInterval(() => {
@@ -99,7 +113,11 @@ const useYoutube = ({ handleSendChat }: Params): UseYoutubeReturn => {
       clearInterval(intervalId)
       resetYoutubeState()
     }
-  }, [youtubePlaying, youtubeCommentInterval, fetchAndProcessCommentsCallback])
+  }, [
+    isStreamingPlaying,
+    youtubeCommentInterval,
+    fetchAndProcessCommentsCallback,
+  ])
 
   return {
     oneCommeStatus: {

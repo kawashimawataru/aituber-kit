@@ -34,6 +34,8 @@ import {
   extractSentenceByMode,
   finalizeStyleBertVits2Tail,
   isInvalidStandaloneTtsUnit,
+  SBV2_MERGE_MAX_CHARS,
+  hasUnclosedJapaneseQuote,
 } from '@/utils/ttsSentenceSplit'
 import { sbv2SpeakBatcher } from '@/features/messages/sbv2SpeakBatcher'
 import { compressImageDataUrl } from '@/utils/compressImageForApi'
@@ -146,6 +148,46 @@ const askAIForMultiModalDecision = async (
 }
 
 const NON_EMOTION_TAG_PREFIX = /^(motion:|stunt:|laugh:|bg:)/i
+
+function escapeForSingleLineLog(text: string): string {
+  // JSON.stringify makes newlines and quotes visible in logs (e.g. "\n", "\"")
+  return JSON.stringify(text)
+}
+
+function logTtsSplitDecision(params: {
+  phase: 'stream' | 'finalize' | 'non-stream'
+  action: 'emit' | 'buffer'
+  text: string
+  sentence?: string
+  remainingText?: string
+  emotionTag?: string
+  motionTag?: string
+}) {
+  const ss = settingsStore.getState()
+  const unclosedQuote = hasUnclosedJapaneseQuote(params.text)
+  const isSbv2 = ss.selectVoice === 'stylebertvits2'
+
+  const parts = [
+    '[TTS-SPLIT]',
+    `phase=${params.phase}`,
+    `voice=${ss.selectVoice}`,
+    `mode=${ss.ttsSplitMode}`,
+    `action=${params.action}`,
+    `unclosedQuote=${unclosedQuote}`,
+    ...(isSbv2 ? [`sbv2MergeMax=${SBV2_MERGE_MAX_CHARS}`] : []),
+    `text=${escapeForSingleLineLog(params.text)}`,
+  ]
+  if (params.sentence !== undefined) {
+    parts.push(`sentence=${escapeForSingleLineLog(params.sentence)}`)
+  }
+  if (params.remainingText !== undefined) {
+    parts.push(`remaining=${escapeForSingleLineLog(params.remainingText)}`)
+  }
+  if (params.emotionTag) parts.push(`emotionTag=${params.emotionTag}`)
+  if (params.motionTag) parts.push(`motionTag=${params.motionTag}`)
+
+  console.info(parts.join(' '))
+}
 
 /**
  * 文中の laugh / stunt タグで SE・演出を発火してから TTS 用にタグ除去
@@ -470,6 +512,15 @@ export const speakMessageHandler = async (receivedMessage: string) => {
           extractSentence(textAfterBg)
 
         if (sentence) {
+          logTtsSplitDecision({
+            phase: 'non-stream',
+            action: 'emit',
+            text: textAfterBg,
+            sentence,
+            remainingText: textAfterSentence,
+            emotionTag,
+            motionTag,
+          })
           const spokenText = prepareSentenceForSpeech(sentence)
           if (spokenText) {
             assistantMessageListRef.current.push(spokenText)
@@ -489,6 +540,13 @@ export const speakMessageHandler = async (receivedMessage: string) => {
           localRemaining = textAfterSentence
         } else {
           if (localRemaining === prevLocalRemaining && localRemaining) {
+            logTtsSplitDecision({
+              phase: 'non-stream',
+              action: 'buffer',
+              text: textAfterBg || localRemaining,
+              emotionTag,
+              motionTag,
+            })
             const finalSentence = prepareSentenceForSpeech(
               textAfterBg || localRemaining
             )
@@ -788,6 +846,15 @@ export const processAIResponse = async (messages: Message[]) => {
                 extractSentence(bsAfterBg)
 
               if (sentence) {
+                logTtsSplitDecision({
+                  phase: 'stream',
+                  action: 'emit',
+                  text: bsAfterBg,
+                  sentence,
+                  remainingText: textAfterSentence,
+                  emotionTag: currentEmotionTag,
+                  motionTag: currentMotionTag,
+                })
                 hasSpeakBeenCalled =
                   handleSpeakAndStateUpdate(
                     sessionId,
@@ -803,6 +870,13 @@ export const processAIResponse = async (messages: Message[]) => {
                   currentMotionTag = ''
                 }
               } else {
+                logTtsSplitDecision({
+                  phase: 'stream',
+                  action: 'buffer',
+                  text: bsAfterBg,
+                  emotionTag: currentEmotionTag,
+                  motionTag: currentMotionTag,
+                })
                 receivedChunksForSpeech =
                   textToProcessBeforeCode + receivedChunksForSpeech
                 textToProcessBeforeCode = ''
@@ -855,6 +929,15 @@ export const processAIResponse = async (messages: Message[]) => {
               extractSentence(msAfterBg)
 
             if (sentence) {
+              logTtsSplitDecision({
+                phase: 'stream',
+                action: 'emit',
+                text: msAfterBg,
+                sentence,
+                remainingText: textAfterSentence,
+                emotionTag: currentEmotionTag,
+                motionTag: currentMotionTag,
+              })
               hasSpeakBeenCalled =
                 handleSpeakAndStateUpdate(
                   sessionId,
@@ -870,6 +953,13 @@ export const processAIResponse = async (messages: Message[]) => {
                 currentMotionTag = ''
               }
             } else {
+              logTtsSplitDecision({
+                phase: 'stream',
+                action: 'buffer',
+                text: msAfterBg,
+                emotionTag: currentEmotionTag,
+                motionTag: currentMotionTag,
+              })
               receivedChunksForSpeech =
                 processableTextForSpeech + receivedChunksForSpeech
               processableTextForSpeech = ''
@@ -894,6 +984,13 @@ export const processAIResponse = async (messages: Message[]) => {
       }
 
       if (done) {
+        console.info(
+          '[TTS-SPLIT] stream done  bufferLen=%d  buffer=%s',
+          receivedChunksForSpeech.length,
+          receivedChunksForSpeech
+            ? JSON.stringify(receivedChunksForSpeech.slice(0, 120))
+            : '(empty)'
+        )
         if (receivedChunksForSpeech.length > 0) {
           if (!isCodeBlock) {
             const finalSentence = receivedChunksForSpeech
@@ -924,6 +1021,15 @@ export const processAIResponse = async (messages: Message[]) => {
               tailText &&
               (!isAutoSbv2 || !isInvalidStandaloneTtsUnit(tailText))
             ) {
+              logTtsSplitDecision({
+                phase: 'finalize',
+                action: 'emit',
+                text: tailText,
+                sentence: tailText,
+                remainingText: '',
+                emotionTag: currentEmotionTag,
+                motionTag: currentMotionTag,
+              })
               hasSpeakBeenCalled =
                 handleSpeakAndStateUpdate(
                   sessionId,

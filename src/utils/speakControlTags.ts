@@ -27,6 +27,25 @@ export function stripSpeakControlTags(text: string): string {
 }
 
 /**
+ * TTS 用テキストからマークダウン記法を除去
+ * **太字**、*斜体*、1. リスト、- 箇条書き、# 見出し など
+ */
+export function stripMarkdownForTts(text: string): string {
+  return text
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*([^*\n]+)\*\*/g, '$1')
+    .replace(/\*([^*\n]+)\*/g, '$1')
+    .replace(/__([^_\n]+)__/g, '$1')
+    .replace(/_([^_\n]+)_/g, '$1')
+    .replace(/^\d+\.\s+/gm, '')
+    .replace(/^[-*+]\s+/gm, '')
+    .replace(/^[-*_]{3,}\s*$/gm, '')
+    .replace(/`[^`\n]+`/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
+/**
  * 画面実況など LLM 出力をプレーンな発話テキストに整える
  */
 export function sanitizeVisionCommentaryText(text: string): string {

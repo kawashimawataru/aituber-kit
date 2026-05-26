@@ -80,6 +80,19 @@ export default async function handler(
       payload.sway_coeff = irodoriTtsSwayCoeff
     }
 
+    // Debug: confirm actual params sent (do not log apiKey)
+    console.info('[irodori-tts] synth', {
+      url: speechUrl,
+      model: irodoriTtsModel,
+      voice: irodoriTtsVoice || '(omitted)',
+      speed: irodoriTtsSpeed,
+      seed: irodoriTtsSeed > 0 ? irodoriTtsSeed : '(omitted)',
+      num_steps: irodoriTtsNumSteps > 0 ? irodoriTtsNumSteps : '(omitted)',
+      sway_coeff: irodoriTtsSwayCoeff !== 0 ? irodoriTtsSwayCoeff : '(omitted)',
+      inputPreview: message.slice(0, 120),
+      inputLen: message.length,
+    })
+
     const voice = await fetch(speechUrl, {
       method: 'POST',
       headers,

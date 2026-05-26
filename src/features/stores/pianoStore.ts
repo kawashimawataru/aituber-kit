@@ -46,7 +46,6 @@ const pianoStore = create<PianoState>()(
 
       removeFromCache: (title) =>
         set((s) => {
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { [title]: _removed, ...rest } = s.scoreCache
           return { scoreCache: rest }
         }),

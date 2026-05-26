@@ -135,10 +135,9 @@ export function extractSentenceForVoice(
   if (voice === 'stylebertvits2') {
     return extractSentenceStyleBertVits2(text)
   }
-  // IrodoriTTS: split at sentence endings only (no comma splits)
-  // The server handles internal 。！？ splitting via split_sentences=True
+  // IrodoriTTS: split at sentence endings only, merging short sentences
   if (voice === 'irodoritts') {
-    return extractSentenceSentenceEnd(text)
+    return extractSentenceIrodoriTts(text)
   }
   return extractSentenceDefault(text)
 }
@@ -177,6 +176,43 @@ export function extractSentenceSentenceEnd(text: string): {
     }
   }
   return { sentence: '', remainingText: text }
+}
+
+/**
+ * IrodoriTTS 向け短文マージしきい値（意味のある文字数）
+ * これ未満の文は次の文と結合して音声品質を安定させる
+ */
+export const IRODORI_MIN_MEANINGFUL_CHARS = 5
+
+/**
+ * IrodoriTTS 向け:
+ * - 句点（。！？）のみで区切る
+ * - 意味文字数が IRODORI_MIN_MEANINGFUL_CHARS 未満の短文は次の文と結合する
+ * - これにより「はぁ！」「ふん。」など短文単体送信による音声品質劣化を防ぐ
+ */
+export function extractSentenceIrodoriTts(text: string): {
+  sentence: string
+  remainingText: string
+} {
+  const first = extractSentenceSentenceEnd(text)
+  if (!first.sentence) return first
+
+  const meaningful = first.sentence.replace(/[!?.,。、！？．\s]+/g, '')
+  if (meaningful.length >= IRODORI_MIN_MEANINGFUL_CHARS) {
+    return first
+  }
+
+  // 短文: 次の文も取得して結合を試みる
+  const second = extractSentenceSentenceEnd(first.remainingText)
+  if (!second.sentence) {
+    // 次の完全文がまだ来ていない → バッファに戻す
+    return { sentence: '', remainingText: text }
+  }
+
+  return {
+    sentence: (first.sentence + second.sentence).trim(),
+    remainingText: second.remainingText,
+  }
 }
 
 /**

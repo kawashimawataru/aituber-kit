@@ -16,6 +16,7 @@ type SettingsTabKey =
   | 'kiosk'
   | 'other'
   | 'projects'
+  | 'avatar'
 interface MenuState {
   showWebcam: boolean
   showCapture: boolean

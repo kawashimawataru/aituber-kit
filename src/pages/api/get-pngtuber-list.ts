@@ -76,8 +76,17 @@ export default async function handler(
       )
       const openSprite = mouthFiles.find((f) => f.toLowerCase() === 'open.png')
 
+      // 静的画像モード: body.png があれば動画不要
+      const bodyFile = files.find((f) => f.toLowerCase() === 'body.png')
+      const isStaticImage = !videoFile && !!bodyFile
+
       // 必須ファイルが揃っているか確認
-      if (!videoFile || !mouthTrackFile || !closedSprite || !openSprite) {
+      if (
+        (!videoFile && !bodyFile) ||
+        !mouthTrackFile ||
+        !closedSprite ||
+        !openSprite
+      ) {
         continue
       }
 
@@ -89,8 +98,9 @@ export default async function handler(
       pngtuberModels.push({
         path: `/pngtuber/${folder.name}`,
         name: folder.name,
-        videoFile,
+        videoFile: videoFile ?? bodyFile!,
         mouthTrack: mouthTrackFile,
+        ...(isStaticImage && { isStaticImage: true }),
         mouthSprites: {
           closed: closedSprite,
           open: openSprite,

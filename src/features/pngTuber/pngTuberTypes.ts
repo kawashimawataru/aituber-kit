@@ -53,6 +53,7 @@ export interface PNGTuberAsset {
   name: string
   videoFile: string
   mouthTrack: string
+  isStaticImage?: boolean // body.png を使う静的画像モード
   mouthSprites: {
     closed: string
     open: string

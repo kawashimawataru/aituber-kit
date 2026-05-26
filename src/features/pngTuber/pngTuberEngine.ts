@@ -22,6 +22,9 @@ export class PNGTuberEngine implements IPNGTuberEngine {
   private mouthCanvas: HTMLCanvasElement
   private mouthCtx: CanvasRenderingContext2D | null
 
+  // 静的画像モード（動画不要）
+  private staticBodyImage: HTMLImageElement | null = null
+
   // クロマキー関連
   private chromaKeyEnabled = false
   private chromaKeyColor = '#00FF00'
@@ -89,32 +92,43 @@ export class PNGTuberEngine implements IPNGTuberEngine {
         throw new Error(`Asset not found: ${assetPath}`)
       }
 
-      // 動画の読み込み
-      const videoUrl = `${asset.path}/${asset.videoFile}`
-      this.video.src = videoUrl
-      this.video.loop = true
-      this.video.muted = true
-      this.video.playsInline = true
-      this.video.preload = 'auto'
-      this.video.controls = false
+      // 静的画像モード: body.png を読み込む
+      this.staticBodyImage = null
+      if (asset.isStaticImage) {
+        const bodyUrl = `${asset.path}/${asset.videoFile}`
+        this.staticBodyImage = await this.loadImage(bodyUrl)
+      } else {
+        // 動画の読み込み
+        const videoUrl = `${asset.path}/${asset.videoFile}`
+        this.video.src = videoUrl
+        this.video.loop = true
+        this.video.muted = true
+        this.video.playsInline = true
+        this.video.preload = 'auto'
+        this.video.controls = false
 
-      await new Promise<void>((resolve, reject) => {
-        const onReady = () => {
-          this.video.removeEventListener('canplaythrough', onReady)
-          this.video.removeEventListener('loadeddata', onReady)
-          resolve()
-        }
-        this.video.addEventListener('canplaythrough', onReady)
-        this.video.addEventListener('loadeddata', onReady)
-        this.video.onerror = () => {
-          reject(new Error('Failed to load video'))
-        }
-        this.video.load()
-      })
+        await new Promise<void>((resolve, reject) => {
+          const onReady = () => {
+            this.video.removeEventListener('canplaythrough', onReady)
+            this.video.removeEventListener('loadeddata', onReady)
+            resolve()
+          }
+          this.video.addEventListener('canplaythrough', onReady)
+          this.video.addEventListener('loadeddata', onReady)
+          this.video.onerror = () => {
+            reject(new Error('Failed to load video'))
+          }
+          this.video.load()
+        })
+      }
 
-      // キャンバスサイズを動画に合わせる
-      const videoWidth = this.video.videoWidth || 1
-      const videoHeight = this.video.videoHeight || 1
+      // キャンバスサイズを設定
+      const videoWidth = this.staticBodyImage
+        ? this.staticBodyImage.naturalWidth
+        : this.video.videoWidth || 1
+      const videoHeight = this.staticBodyImage
+        ? this.staticBodyImage.naturalHeight
+        : this.video.videoHeight || 1
 
       this.mainCanvas.width = videoWidth
       this.mainCanvas.height = videoHeight
@@ -615,32 +629,40 @@ export class PNGTuberEngine implements IPNGTuberEngine {
    * レンダリングを開始
    */
   start(): void {
-    if (!this.video || !this.trackData) {
-      console.warn('Cannot start: video or trackData not loaded')
+    if (!this.trackData) {
+      console.warn('Cannot start: trackData not loaded')
+      return
+    }
+    if (!this.staticBodyImage && !this.video) {
+      console.warn('Cannot start: no body image or video loaded')
       return
     }
 
-    // 既に実行中の場合は先に停止する（重複ループを防止）
     if (this.isRunning) {
       this.stop()
     }
 
     this.isRunning = true
 
-    // ResizeObserverをセットアップ
-    if ('ResizeObserver' in window && !this.resizeObserver) {
-      this.resizeObserver = new ResizeObserver(() => this.handleResize())
-      this.resizeObserver.observe(this.video)
+    if (this.staticBodyImage) {
+      // 静的画像モード: 動画再生不要、RAFでレンダリング
+      this.startRenderLoop()
+    } else {
+      // ResizeObserverをセットアップ
+      if ('ResizeObserver' in window && !this.resizeObserver) {
+        this.resizeObserver = new ResizeObserver(() => this.handleResize())
+        this.resizeObserver.observe(this.video)
+      }
+
+      // 動画を再生
+      this.video.currentTime = 0
+      this.video.play().catch((err) => {
+        console.warn('Video play failed:', err)
+      })
+
+      // レンダリングループを開始
+      this.startRenderLoop()
     }
-
-    // 動画を再生
-    this.video.currentTime = 0
-    this.video.play().catch((err) => {
-      console.warn('Video play failed:', err)
-    })
-
-    // レンダリングループを開始
-    this.startRenderLoop()
   }
 
   /**
@@ -664,6 +686,17 @@ export class PNGTuberEngine implements IPNGTuberEngine {
    */
   private startRenderLoop(): void {
     if (!this.isRunning) return
+
+    // 静的画像モードは常にRAF
+    if (this.staticBodyImage) {
+      const loop = () => {
+        if (!this.isRunning) return
+        this.renderFrame()
+        this.animationId = requestAnimationFrame(loop)
+      }
+      loop()
+      return
+    }
 
     // requestVideoFrameCallbackがあれば使用（より正確な同期）
     if ('requestVideoFrameCallback' in this.video) {
@@ -696,13 +729,26 @@ export class PNGTuberEngine implements IPNGTuberEngine {
    * 1フレームをレンダリング
    */
   private renderFrame(): void {
-    const video = this.video
     const data = this.trackData
-
-    if (!video || video.readyState < 2 || !data) return
+    if (!data) return
 
     const totalFrames = data.frames.length
     if (!totalFrames) return
+
+    // 静的画像モード: 常にフレーム0を使用
+    if (this.staticBodyImage) {
+      const frameIndex = 0
+      this.lastFrameIndex = frameIndex
+      if (this.chromaKeyEnabled) {
+        this.renderStaticWithChromaKey(frameIndex)
+      } else {
+        this.renderStaticBody(frameIndex)
+      }
+      return
+    }
+
+    const video = this.video
+    if (!video || video.readyState < 2) return
 
     const currentTime = video.currentTime
     const fps = data.fps || 30
@@ -714,6 +760,27 @@ export class PNGTuberEngine implements IPNGTuberEngine {
     } else {
       this.updateMouthTransform(frameIndex)
     }
+  }
+
+  private renderStaticBody(frameIndex: number): void {
+    const img = this.staticBodyImage
+    if (!img || !this.mainCtx || !this.mainCanvas) return
+    const ctx = this.mainCtx
+    ctx.clearRect(0, 0, this.mainCanvas.width, this.mainCanvas.height)
+    ctx.drawImage(img, 0, 0, this.mainCanvas.width, this.mainCanvas.height)
+    this.drawMouthSpriteOnMain(frameIndex)
+  }
+
+  private renderStaticWithChromaKey(frameIndex: number): void {
+    const img = this.staticBodyImage
+    if (!img || !this.mainCtx || !this.mainCanvas) return
+    const ctx = this.mainCtx
+    const width = this.mainCanvas.width
+    const height = this.mainCanvas.height
+    ctx.clearRect(0, 0, width, height)
+    ctx.drawImage(img, 0, 0, width, height)
+    this.applyChromaKey(ctx, width, height)
+    this.drawMouthSpriteOnMain(frameIndex)
   }
 
   /**

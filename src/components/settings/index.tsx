@@ -20,6 +20,7 @@ import PresenceSettings from './presenceSettings'
 import IdleSettings from './idleSettings'
 import KioskSettings from './kioskSettings'
 import Projects from './projects'
+import AvatarGeneration from './avatarGeneration'
 
 type Props = {
   onClickClose: () => void
@@ -67,6 +68,7 @@ type TabKey =
   | 'other'
   | 'speechInput'
   | 'projects'
+  | 'avatar'
 
 // アイコンのパスマッピング
 const tabIconMapping: Record<TabKey, string> = {
@@ -85,6 +87,7 @@ const tabIconMapping: Record<TabKey, string> = {
   other: '/images/setting-icons/other-settings.svg',
   speechInput: '/images/setting-icons/microphone-settings.svg',
   projects: '/images/setting-icons/projects.svg',
+  avatar: '/images/setting-icons/image-settings.svg',
 }
 
 const Main = () => {
@@ -179,6 +182,10 @@ const Main = () => {
       key: 'projects',
       label: t('ProjectsSettings'),
     },
+    {
+      key: 'avatar',
+      label: t('AvatarSettings'),
+    },
   ]
 
   const renderTabContent = () => {
@@ -213,6 +220,8 @@ const Main = () => {
         return <SpeechInput />
       case 'projects':
         return <Projects />
+      case 'avatar':
+        return <AvatarGeneration />
     }
   }
 

@@ -1,6 +1,10 @@
+import { Ticker, UPDATE_PRIORITY } from 'pixi.js'
 import { Talk } from './messages'
 import homeStore from '@/features/stores/home'
 import settingsStore from '@/features/stores/settings'
+
+const LIP_SYNC_PARAM = 'ParamMouthOpenY'
+const LIP_SYNC_SAMPLE_RATE = 24000 // IrodoriTTS PCM output rate
 
 function pickRandomEmotion(list: string[] | undefined): string | undefined {
   if (!list?.length) return undefined
@@ -8,7 +12,8 @@ function pickRandomEmotion(list: string[] | undefined): string | undefined {
 }
 
 export class Live2DHandler {
-  private static idleMotionInterval: NodeJS.Timeout | null = null // インターバルIDを保持
+  private static idleMotionInterval: NodeJS.Timeout | null = null
+  private static lipSyncTicker: (() => void) | null = null
 
   static async speak(
     audioBuffer: ArrayBuffer,
@@ -56,6 +61,7 @@ export class Live2DHandler {
 
     let durationSec = 10
     let audioUrl: string
+    let lipSyncPcm: Int16Array | null = null
 
     if (isNeedDecode) {
       const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' })
@@ -64,6 +70,12 @@ export class Live2DHandler {
         const audioContext = new AudioContext()
         const decoded = await audioContext.decodeAudioData(audioBuffer.slice(0))
         durationSec = decoded.duration || 10
+        // WAV → Float32 → Int16 for lip sync amplitude analysis
+        const ch = decoded.getChannelData(0)
+        lipSyncPcm = new Int16Array(ch.length)
+        for (let i = 0; i < ch.length; i++) {
+          lipSyncPcm[i] = Math.max(-32768, Math.min(32767, ch[i] * 32767))
+        }
         await audioContext.close().catch(() => undefined)
       } catch {
         durationSec = 10
@@ -71,6 +83,7 @@ export class Live2DHandler {
     } else {
       const audioContext = new AudioContext()
       const pcmData = new Int16Array(audioBuffer)
+      lipSyncPcm = pcmData
       const floatData = new Float32Array(pcmData.length)
       for (let i = 0; i < pcmData.length; i++) {
         floatData[i] =
@@ -94,6 +107,14 @@ export class Live2DHandler {
       Live2DHandler.stopIdleMotion()
       live2dViewer.motion(motion, undefined, 3)
     }
+    // 発話中もアイドルと同じ揺れを低優先度で継続（優先度1=他のモーション中は割り込まない）
+    const speakIdleMotion = ss.idleMotionGroup || 'Idle'
+    Live2DHandler.startSpeakingIdleMotion(live2dViewer, speakIdleMotion)
+
+    // PCM振幅からリップシンク駆動
+    if (lipSyncPcm) {
+      Live2DHandler.startManualLipSync(lipSyncPcm, LIP_SYNC_SAMPLE_RATE, live2dViewer)
+    }
 
     // live2dViewer.speak の onFinish コールバックを利用して音声再生完了を検知
     // StopSpeaking で強制停止された場合 onFinish が呼び出されず Promise が未解決のまま
@@ -104,6 +125,7 @@ export class Live2DHandler {
       const finish = () => {
         if (resolved) return
         resolved = true
+        Live2DHandler.stopManualLipSync(live2dViewer)
         resolve()
         URL.revokeObjectURL(audioUrl)
       }
@@ -205,6 +227,100 @@ export class Live2DHandler {
 
     // 5秒ごとのアイドルモーション再生を開始
     Live2DHandler.startIdleMotion(idleMotion)
+  }
+
+  // PCM振幅からリップシンクを駆動（PixiJS Ticker の LOW 優先度でモーション更新後に上書き）
+  private static startManualLipSync(
+    pcm: Int16Array,
+    sampleRate: number,
+    viewer: NonNullable<ReturnType<typeof homeStore.getState>['live2dViewer']>
+  ) {
+    Live2DHandler.stopManualLipSync(viewer)
+
+    const frameMs = 33 // ~30fps
+    const samplesPerFrame = Math.floor((sampleRate * frameMs) / 1000)
+
+    // RMS 振幅フレームを計算
+    const frames: number[] = []
+    for (let i = 0; i < pcm.length; i += samplesPerFrame) {
+      let sum = 0
+      const end = Math.min(i + samplesPerFrame, pcm.length)
+      for (let j = i; j < end; j++) {
+        const s = pcm[j] / 32768
+        sum += s * s
+      }
+      frames.push(Math.sqrt(sum / (end - i)))
+    }
+
+    // 正規化 + 平滑化
+    const maxAmp = Math.max(...frames, 0.001)
+    const smoothed = frames.map((v, i) => {
+      const prev = frames[i - 1] ?? v
+      const next = frames[i + 1] ?? v
+      return ((prev + v * 2 + next) / 4) / maxAmp
+    })
+
+    const startTime = performance.now()
+
+    const tick = () => {
+      const elapsed = performance.now() - startTime
+      const idx = Math.floor(elapsed / frameMs)
+      const amp = idx < smoothed.length ? smoothed[idx] : 0
+      const mouthValue = Math.min(amp * 1.4, 1.0)
+      try {
+        const coreModel = (viewer as any).internalModel?.coreModel
+        if (coreModel) {
+          coreModel.setParameterValueById(LIP_SYNC_PARAM, mouthValue)
+        }
+      } catch {
+        Ticker.shared.remove(tick)
+        Live2DHandler.lipSyncTicker = null
+      }
+    }
+
+    Ticker.shared.add(tick, undefined, UPDATE_PRIORITY.LOW)
+    Live2DHandler.lipSyncTicker = tick
+  }
+
+  private static stopManualLipSync(
+    viewer?: NonNullable<ReturnType<typeof homeStore.getState>['live2dViewer']>
+  ) {
+    if (Live2DHandler.lipSyncTicker) {
+      Ticker.shared.remove(Live2DHandler.lipSyncTicker)
+      Live2DHandler.lipSyncTicker = null
+    }
+    // 口を閉じる
+    if (viewer) {
+      try {
+        const coreModel = (viewer as any).internalModel?.coreModel
+        if (coreModel) coreModel.setParameterValueById(LIP_SYNC_PARAM, 0)
+      } catch {}
+    }
+  }
+
+  // 発話中アイドルモーション（優先度1：感情モーションを邪魔しない）
+  private static startSpeakingIdleMotion(
+    viewer: NonNullable<ReturnType<typeof homeStore.getState>['live2dViewer']>,
+    idleMotion: string
+  ) {
+    this.idleMotionInterval = setInterval(() => {
+      const ss = settingsStore.getState()
+      if (ss.modelType !== 'live2d') {
+        this.stopIdleMotion()
+        return
+      }
+      const currentViewer = homeStore.getState().live2dViewer
+      if (!currentViewer || (currentViewer as any).destroyed) {
+        this.stopIdleMotion()
+        return
+      }
+      try {
+        // 優先度1(IDLE)：感情モーション(優先度3)の再生中は割り込まず、終了後に自然に埋める
+        currentViewer.motion(idleMotion, undefined, 1)
+      } catch {
+        this.stopIdleMotion()
+      }
+    }, 3500)
   }
 
   // アイドルモーションのインターバル開始

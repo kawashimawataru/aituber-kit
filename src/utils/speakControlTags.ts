@@ -22,6 +22,8 @@ export function stripSpeakControlTags(text: string): string {
     .replace(META_TAG_PATTERN, '')
     .replace(EMOTION_TAG_PATTERN, '')
     .replace(UNKNOWN_ASCII_TAG_PATTERN, '')
+    // 末尾の未完了タグ（]が来る前にテキストが終わった場合: "[motion" "[motion:le" 等）
+    .replace(/\[[^\]]*$/, '')
     .replace(/\s{2,}/g, ' ')
     .trim()
 }
